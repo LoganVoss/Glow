@@ -1,7 +1,7 @@
 ![Glow framing Codex in dark mode](GitHub%20Photos/Screen%20Shot%202%20-%20Chat%20Window%20Light.png)
 
 <h1 align="center">Glow (Codex Neon Appearance Plugin)</h1>
-<p align="center">Soft light. Fluid motion. A workspace that feels like yours.</p>
+<p align="center">The party starts here.</p>
 <p align="center">Created by <strong>Logan Voss + Astra 6 Ultra</strong></p>
 <p align="center">
   <a href="https://www.youtube.com/watch?v=H-9Ug0_luwg">Watch the demo</a> ·
@@ -13,7 +13,7 @@ Glow wraps Codex in a continuous, softly diffused color border. Tune it inside *
 
 **macOS · Apple silicon · MIT code · v0.8.9**
 
-An independent, experimental appearance patch. It integrates into your locally installed app; it is not an official OpenAI plugin or endorsed by OpenAI.
+An independent, experimental appearance patch. It integrates into your locally installed app; it is not (yet) an official OpenAI plugin or endorsed by OpenAI.
 
 ![Glow framing Codex in light mode](GitHub%20Photos/Screen%20Shot%201%20-%20Chat%20Window%20Light.png)
 
