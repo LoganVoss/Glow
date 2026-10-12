@@ -1,0 +1,65 @@
+# Local source app, staging, recovery, reports, and signing metadata
+.local/
+*.app
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.7z
+*.dmg
+*.pkg
+*.asar
+*.asar.unpacked/
+.neon-codex-build-*/
+staging/
+recovery/
+*-report.json
+build-report.json
+validation.json
+install-status.json
+crash-diagnosis.json
+*.log
+logs/
+reports/
+build-reports/
+*.crash
+*.ips
+
+# Dependencies and generated output
+node_modules/
+dist/
+build/
+coverage/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Credentials and machine-specific configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.cer
+*.crt
+*.der
+*.key
+*.p12
+*.pfx
+*.mobileprovision
+*.provisionprofile
+*.keychain
+*.keychain-db
+local-config.*
+
+# Editor and operating-system files
+.DS_Store
+._*
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Personal screen recordings; the public demo is hosted on YouTube
+*.mp4
+*.mov

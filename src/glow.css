@@ -1,0 +1,217 @@
+/* Neon Codex 0.8 — one rounded surface: Bloom, Pulse, and Ping. */
+@property --neon-phase {
+  syntax: "<angle>";
+  inherits: true;
+  initial-value: 0deg;
+}
+
+/* Keep the six palette channels live inside every gradient. Typed colors let
+   the browser interpolate a new selection from the currently displayed color,
+   including when another selection arrives before the previous one finishes.
+   No extra frames, clock restarts, assets, or per-frame JavaScript are needed. */
+@property --neon-color-1 { syntax: "<color>"; inherits: true; initial-value: #b572ff; }
+@property --neon-color-2 { syntax: "<color>"; inherits: true; initial-value: #f06ac6; }
+@property --neon-color-3 { syntax: "<color>"; inherits: true; initial-value: #ff9b72; }
+@property --neon-color-4 { syntax: "<color>"; inherits: true; initial-value: #f3d96a; }
+@property --neon-color-5 { syntax: "<color>"; inherits: true; initial-value: #6fdfb6; }
+@property --neon-color-6 { syntax: "<color>"; inherits: true; initial-value: #69b6ff; }
+
+/* The clock stays alive when the light is off. Changing enabled only changes
+   opacity, so a quick reversal dissolves from the current image and intensity. */
+@keyframes neon-glow-orbit {
+  from { --neon-phase: 0deg; }
+  to { --neon-phase: 360deg; }
+}
+
+[data-neon-codex-frame] {
+  --neon-thickness: 1.2px;
+  --neon-spread: 7.5px;
+  --neon-intensity: .65;
+  --neon-saturation: 1.6;
+  --neon-hue: 0deg;
+  --neon-depth: .77;
+  --neon-gloss: 1;
+  --neon-duration: 17.56097561s;
+  --neon-color-1: #b572ff;
+  --neon-color-2: #f06ac6;
+  --neon-color-3: #ff9b72;
+  --neon-color-4: #f3d96a;
+  --neon-color-5: #6fdfb6;
+  --neon-color-6: #69b6ff;
+  --neon-render-scale: 1;
+  --neon-flow-stops: var(--neon-color-1) 0deg, var(--neon-color-2) 60deg,
+    var(--neon-color-3) 120deg, var(--neon-color-4) 180deg,
+    var(--neon-color-5) 240deg, var(--neon-color-6) 300deg, var(--neon-color-1) 360deg;
+  --neon-prism-stops: var(--neon-color-1) 0deg, var(--neon-color-2) 20deg,
+    var(--neon-color-3) 40deg, var(--neon-color-4) 60deg,
+    var(--neon-color-5) 80deg, var(--neon-color-6) 100deg, var(--neon-color-1) 120deg;
+  --neon-field: repeating-conic-gradient(from var(--neon-phase) in oklab, var(--neon-prism-stops));
+  --neon-gloss-field: conic-gradient(from calc(var(--neon-phase) * -1) in oklab,
+    rgb(255 255 255 / calc(var(--neon-gloss) * .08)) 0deg,
+    rgb(255 255 255 / calc(var(--neon-gloss) * .18)) 55deg,
+    rgb(255 255 255 / calc(var(--neon-gloss) * .8)) 120deg,
+    rgb(255 255 255 / calc(var(--neon-gloss) * .16)) 185deg,
+    rgb(255 255 255 / 0) 265deg,
+    rgb(255 255 255 / calc(var(--neon-gloss) * .08)) 360deg);
+  position: absolute;
+  inset-block: var(--app-shell-titlebar-height, 0px) 0;
+  inset-inline: var(--app-shell-navigation-rail-width, 0px) 0;
+  border-radius: var(--app-shell-window-radius, var(--radius-xl-base, 12px));
+  z-index: 44;
+  overflow: hidden;
+  isolation: isolate;
+  contain: layout paint;
+  pointer-events: none !important;
+  user-select: none;
+  opacity: var(--neon-intensity);
+  transition:
+    opacity 620ms cubic-bezier(.22, .61, .36, 1),
+    --neon-color-1 420ms cubic-bezier(.22, .61, .36, 1),
+    --neon-color-2 420ms cubic-bezier(.22, .61, .36, 1),
+    --neon-color-3 420ms cubic-bezier(.22, .61, .36, 1),
+    --neon-color-4 420ms cubic-bezier(.22, .61, .36, 1),
+    --neon-color-5 420ms cubic-bezier(.22, .61, .36, 1),
+    --neon-color-6 420ms cubic-bezier(.22, .61, .36, 1);
+  filter: hue-rotate(var(--neon-hue)) saturate(var(--neon-saturation));
+  animation: neon-glow-orbit var(--neon-duration) linear infinite;
+}
+
+[data-neon-codex-frame], [data-neon-codex-frame] * {
+  box-sizing: border-box;
+  pointer-events: none !important;
+}
+
+[data-neon-codex-frame][data-enabled="false"] { opacity: 0; }
+/* Legacy pause remains harmless. The runtime reverses the animation effect
+   while reflecting its current phase, keeping the positive clock continuous. */
+[data-neon-codex-frame][data-paused="true"] { animation-play-state: paused; }
+
+/* Blur a completed rounded ring, then clip the composite to the same curve.
+   Every pattern uses this same mask: no tiles, corner pieces, or moving edges. */
+.neon-glow-blur,
+.neon-glow-color,
+.neon-glow-edge,
+.neon-glow-depth {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+.neon-glow-blur {
+  filter: blur(calc(var(--neon-spread) * .44 * var(--neon-render-scale)));
+  opacity: .9;
+}
+
+.neon-glow-color,
+.neon-glow-edge {
+  padding: calc(var(--neon-thickness) * var(--neon-render-scale));
+  background: var(--neon-field);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+}
+
+.neon-glow-color {
+  padding: calc((var(--neon-thickness) + var(--neon-spread) * .24) * var(--neon-render-scale));
+}
+
+.neon-glow-edge {
+  background: var(--neon-gloss-field), var(--neon-field);
+}
+
+.neon-glow-depth {
+  opacity: var(--neon-depth);
+  box-shadow:
+    inset 0 calc(1px * var(--neon-render-scale)) calc(1px * var(--neon-render-scale)) rgb(255 255 255 / .72),
+    inset 0 calc(-1px * var(--neon-render-scale)) calc(1px * var(--neon-render-scale)) rgb(29 24 52 / .28),
+    inset calc(1px * var(--neon-render-scale)) 0 calc(1px * var(--neon-render-scale)) rgb(255 255 255 / .16),
+    inset calc(-1px * var(--neon-render-scale)) 0 calc(1px * var(--neon-render-scale)) rgb(29 24 52 / .14);
+}
+
+/* Bloom preserves the original repeating conic field and its moving gloss. */
+[data-neon-codex-frame][data-pattern="prism"] {
+  --neon-field: repeating-conic-gradient(from var(--neon-phase) in oklab, var(--neon-prism-stops));
+}
+
+/* Pulse breathes across the whole perimeter. Its palette and highlights stay
+   still; only the light level and halo softness swell. Two cosine breaths per
+   clock have soft, motionless turnarounds and identical loop endpoints. */
+[data-neon-codex-frame][data-pattern="pulse"] {
+  --neon-breath: calc(.5 - .5 * cos(mod(var(--neon-phase), 360deg) * 2));
+  --neon-field: conic-gradient(from -20deg in oklab, var(--neon-flow-stops));
+  --neon-gloss-field: linear-gradient(125deg,
+    rgb(255 255 255 / calc(var(--neon-gloss) * .08)) 0%,
+    rgb(255 255 255 / calc(var(--neon-gloss) * .30)) 46%,
+    rgb(255 255 255 / calc(var(--neon-gloss) * .08)) 100%);
+}
+
+/* Child-layer modulation leaves intensity and the reversible on/off dissolve
+   on the frame. The trough retains light; Pulse never flashes fully off. */
+[data-neon-codex-frame][data-pattern="pulse"] .neon-glow-blur {
+  opacity: calc(.44 + .46 * var(--neon-breath));
+  filter:
+    blur(calc(var(--neon-spread) * (.35 + .16 * var(--neon-breath)) * var(--neon-render-scale)))
+    brightness(calc(.9 + .16 * var(--neon-breath)));
+}
+
+[data-neon-codex-frame][data-pattern="pulse"] .neon-glow-edge {
+  opacity: calc(.46 + .54 * var(--neon-breath));
+  filter: brightness(calc(.9 + .1 * var(--neon-breath)));
+}
+
+/* Signal has a bright leading crest, a long spectral tail, and a quiet rail.
+   Matching colors/alpha at zero and 360 degrees make every lap continuous. */
+[data-neon-codex-frame][data-pattern="signal"] {
+  --neon-field:
+    conic-gradient(from var(--neon-phase) in oklab,
+      var(--neon-color-6) 0deg,
+      color-mix(in oklab, var(--neon-color-6) 68%, transparent) 5deg,
+      color-mix(in oklab, var(--neon-color-6) 0%, transparent) 18deg 230deg,
+      color-mix(in oklab, var(--neon-color-1) 10%, transparent) 250deg,
+      color-mix(in oklab, var(--neon-color-2) 24%, transparent) 278deg,
+      color-mix(in oklab, var(--neon-color-3) 42%, transparent) 306deg,
+      color-mix(in oklab, var(--neon-color-4) 65%, transparent) 330deg,
+      color-mix(in oklab, var(--neon-color-5) 88%, transparent) 348deg,
+      var(--neon-color-6) 360deg),
+    conic-gradient(from -20deg in oklab,
+      color-mix(in oklab, var(--neon-color-1) 16%, transparent) 0deg,
+      color-mix(in oklab, var(--neon-color-2) 16%, transparent) 60deg,
+      color-mix(in oklab, var(--neon-color-3) 16%, transparent) 120deg,
+      color-mix(in oklab, var(--neon-color-4) 16%, transparent) 180deg,
+      color-mix(in oklab, var(--neon-color-5) 16%, transparent) 240deg,
+      color-mix(in oklab, var(--neon-color-6) 16%, transparent) 300deg,
+      color-mix(in oklab, var(--neon-color-1) 16%, transparent) 360deg);
+  --neon-gloss-field: conic-gradient(from var(--neon-phase) in oklab,
+    rgb(255 255 255 / calc(var(--neon-gloss) * .8)) 0deg,
+    rgb(255 255 255 / 0) 14deg 270deg,
+    rgb(255 255 255 / calc(var(--neon-gloss) * .12)) 320deg,
+    rgb(255 255 255 / calc(var(--neon-gloss) * .8)) 360deg);
+}
+
+/* Samples use the same material and motion at a compact spatial scale. */
+[data-neon-codex-frame].neon-glow-sample {
+  --app-shell-titlebar-height: 0px;
+  --app-shell-navigation-rail-width: 0px;
+  --app-shell-window-radius: 16px;
+  z-index: 1;
+}
+
+:root[data-reduced-motion="true"] [data-neon-codex-frame],
+[data-neon-codex-frame][data-reduced-motion="true"] {
+  animation: none;
+  transition-duration: 80ms;
+  --neon-phase: 28deg;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-reduced-motion]) [data-neon-codex-frame] {
+    animation: none;
+    transition-duration: 80ms;
+    --neon-phase: 28deg;
+  }
+}
+
+@media print {
+  [data-neon-codex-frame] { display: none !important; }
+}

@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en" data-codex-window-type="electron" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Neon Codex — Appearance preview</title>
+  <link rel="stylesheet" href="../src/glow.css">
+  <link rel="stylesheet" href="../src/settings.css">
+  <link rel="stylesheet" href="preview.css">
+  <script type="module" src="../src/neon-codex.js"></script>
+  <script type="module" src="preview.js"></script>
+</head>
+<body>
+  <header class="preview-heading">
+    <a href="./index.html" aria-label="Neon Codex preview"><span class="brand-dot" aria-hidden="true"></span>Neon Codex</a>
+    <span>Appearance study <span class="version">0.8.9</span></span>
+    <button id="view-toggle" type="button">Show workspace</button>
+  </header>
+  <div data-app-shell-frame data-app-shell-page-surface="true">
+    <div data-app-shell-workspace-row>
+      <div class="page-surface"></div>
+      <div class="titlebar"><i></i><i></i><i></i><span class="window-title">Codex</span></div>
+      <nav class="rail" aria-label="Preview navigation"><span>⌂</span><span>▱</span><span>◷</span><span>◎</span><span>⋯</span><span class="rail-bottom">NC</span></nav>
+      <aside class="sidebar">
+        <strong>Codex <span>⌄</span></strong>
+        <div class="sidebar-action">＋ <span>New chat</span></div>
+        <div class="sidebar-label">Recents</div>
+        <div class="sidebar-item">A little more atmosphere</div>
+        <div class="sidebar-item">Make room for focus</div>
+        <div class="sidebar-item">Refine the finishing touches</div>
+        <div class="sidebar-label">Projects <span>›</span></div>
+        <button id="sidebar-settings" type="button">⚙ <span>Appearance</span></button>
+      </aside>
+      <main class="main">
+        <section id="appearance-view" aria-labelledby="appearance-title">
+          <div class="settings-path">Settings <span>/</span> Appearance</div>
+          <h1 id="appearance-title">Appearance</h1>
+          <p class="appearance-intro">Make this space your own.</p>
+          <div class="native-row"><div><h2>Theme</h2><p>Choose how Codex looks on this device.</p></div><div class="theme-picker" role="group" aria-label="App appearance"><button id="light-theme" type="button" aria-pressed="true">☀ <span>Light</span></button><button id="dark-theme" type="button" aria-pressed="false">☾ <span>Dark</span></button></div></div>
+          <div data-neon-settings-slot="v1"></div>
+        </section>
+        <section id="workspace-view" hidden aria-labelledby="workspace-title">
+          <div class="workspace-welcome"><span class="workspace-mark" aria-hidden="true">›_</span><h1 id="workspace-title">What should we build?</h1></div>
+          <div class="composer"><label class="sr-only" for="message">Try typing through the glow</label><input id="message" placeholder="Ask anything" autocomplete="off"><div><span>＋ <span>This computer</span></span><button type="button" aria-label="Preview send">↑</button></div></div>
+        </section>
+      </main>
+    </div>
+  </div>
+  <footer><span>Live controls. Independent light and dark profiles.</span><button id="reduce-motion" type="button" aria-pressed="false">Test reduced motion</button><button id="test-dialog" type="button">Test dialog</button><span class="preview-note">Standalone fixture · not the running app</span></footer>
+  <dialog id="test-modal"><h2>Room to focus.</h2><p>The glow stays behind dialogs and leaves every control accessible.</p><button id="close-dialog" type="button">Done</button></dialog>
+</body>
+</html>

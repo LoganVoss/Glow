@@ -1,0 +1,38 @@
+{
+  "26.1007.21159:20052": {
+    "bundle": "com.openai.codex",
+    "version": "26.1007.21159",
+    "build": "20052",
+    "header": "c497f508930f223a999ec4c436a7526252914d380339db9e229cb023d200b41f",
+    "css": "webview/assets/app-shared-9a94b907ed47.css",
+    "cssHash": "69f929f71947824fed18365d54c8aa0c975a856649339e585a50f6f547e215d7",
+    "framework": "Contents/Frameworks/Codex Framework.framework/Codex Framework",
+    "fuse": "010011001",
+    "html": "webview/index.html",
+    "htmlHash": "9d93a3625cb45cafa4ea89417f38276ce9195005f6dbb287ef792d07cad7a4de",
+    "appearance": "webview/assets/appearance-settings-b1f6f0e26b1c.js",
+    "appearanceHash": "5dd40dd1e12516380de1aea955805231cc1fa13f21c94b82588ac1b0c97a44d3",
+    "settingsBridge": "webview/assets/app-shared-2f2228189a8d.js",
+    "settingsBridgeHash": "47b7173d0bbecc5f6f32157134add7be65c0a22c2555c5bbeb9665b1bcded7b0",
+    "generalSettings": "webview/assets/general-settings-4f37c778160b.js",
+    "generalSettingsHash": "10cd35701d94918a65bcc4a2a1bd8673cc0d58a68eaab09ab37a2efbf877541d"
+  },
+  "26.1007.30912:20156": {
+    "bundle": "com.openai.codex",
+    "version": "26.1007.30912",
+    "build": "20156",
+    "header": "0ba43368dc2f01fcf2a29c8e02f30cc6bb879ce268c8672734504f791526ce50",
+    "css": "webview/assets/app-shared-9a94b907ed47.css",
+    "cssHash": "69f929f71947824fed18365d54c8aa0c975a856649339e585a50f6f547e215d7",
+    "framework": "Contents/Frameworks/Codex Framework.framework/Codex Framework",
+    "fuse": "010011001",
+    "html": "webview/index.html",
+    "htmlHash": "fbdbdbc3d10bc13ebb49e6175673c77fafbcbcdec90a7f7e147ad91950145a0b",
+    "appearance": "webview/assets/appearance-settings-bf899ed18bb8.js",
+    "appearanceHash": "d39409d7dc24cd229721475a2a620d0e0f72bfa222580850f91ee8f204e3d528",
+    "settingsBridge": "webview/assets/app-shared-8bd9d0399038.js",
+    "settingsBridgeHash": "607ad0866dd25ed3764711b4467a9b60708353a599485b5249ff4cbe0e870245",
+    "generalSettings": "webview/assets/general-settings-65e65871cdcd.js",
+    "generalSettingsHash": "f33572c6e595282128f80cfcbfc255d3edd6ed63613665e96b15251664d89982"
+  }
+}

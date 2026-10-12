@@ -1,0 +1,39 @@
+{
+  "name": "neon-codex-local-theme",
+  "version": "0.8.9",
+  "private": true,
+  "type": "module",
+  "description": "Unofficial, version-pinned local macOS appearance patch for Codex in the ChatGPT desktop app.",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "inspect": "node scripts/build.mjs --inspect",
+    "check:assets": "node scripts/build.mjs --check-assets",
+    "build": "node scripts/build.mjs",
+    "check:identity": "node scripts/build.mjs --check-identity",
+    "check:install": "/usr/bin/python3 scripts/install.py --check install",
+    "install:theme": "/usr/bin/python3 scripts/install.py --wait install",
+    "restore": "/usr/bin/python3 scripts/install.py --wait restore",
+    "test:installer": "/usr/bin/python3 scripts/install.py --self-test",
+    "test:recovery": "/usr/bin/python3 tests/recovery_test.py",
+    "test:archive": "node scripts/build.mjs --self-test-archive",
+    "test:runtime": "node --test tests/runtime.test.mjs",
+    "test": "node --test tests/runtime.test.mjs",
+    "test:browser": "node --test tests/browser.test.mjs",
+    "refresh": "/usr/bin/python3 scripts/refresh.py",
+    "test:refresh": "/usr/bin/python3 tests/refresh_test.py"
+  },
+  "dependencies": {
+    "@electron/asar": "4.1.0"
+  },
+  "devDependencies": {
+    "playwright": "1.62.1"
+  },
+  "license": "MIT",
+  "author": "Logan Voss",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/LoganVoss/Glow.git"
+  }
+}
