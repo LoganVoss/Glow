@@ -9,7 +9,7 @@
   <a href="#after-an-app-update">Refresh after an update</a>
 </p>
 
-Glow wraps Codex in a continuous, softly diffused color border. Tune it inside **Settings → Appearance → Glow**, with separate light and dark looks and motion that stays with you as you move between chats and settings.
+Glow wraps Codex in a continuous, softly diffused color border. Tune it inside **Settings → Appearance → Glow**, with separate light and dark looks and motion that stays with you as you move between windows.
 
 ![Glow framing Codex in light mode](GitHub%20Photos/Screen%20Shot%201%20-%20Chat%20Window%20Light.png)
 
