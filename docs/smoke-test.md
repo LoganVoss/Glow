@@ -7,6 +7,7 @@ Record the patch version, app version/build, macOS version, display scaling, and
 ## Startup and recovery
 
 - [ ] The normal application path opens without a crash or signing error.
+- [ ] Record any macOS Keychain authorization prompt on first launch, unchanged relaunch, and a subsequent rebuild. Distinguish successful launch after authorization from a prompt-free experience. Never record Always Allow as permanent across future app identities without evidence.
 - [ ] The expected account, existing chats, and projects are available.
 - [ ] The app can quit fully and reopen without losing settings.
 - [ ] Restore Previous Codex returns the exact prior bundle and that app opens.

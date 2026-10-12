@@ -8,23 +8,35 @@ Exact source metadata lives in `scripts/source-pins.json`. The builder selects t
 
 ```sh
 npm run inspect -- --source '/absolute/path/to/original/ChatGPT.app'
-npm run build -- --source '/absolute/path/to/original/ChatGPT.app' --identity YOUR_CERTIFICATE_SHA1
+npm run build -- --source '/absolute/path/to/original/ChatGPT.app' --local-signing
 ```
 
 The default staged output is `.local/staging/ChatGPT.app`. The installer targets `/Applications/ChatGPT.app` only. The builder's `--installed-app` option records another baseline for inspection or testing; it does not change the installation destination. Output and source are separate, and an existing output must not be overwritten. Keep original, staging, and recovery bundles out of Git.
 
 ## Signing
 
-Use your own valid Apple-issued development identity, including its private key in your Keychain. The build requires an explicit certificate SHA-1 through `--identity`. The Finder build launcher may select an identity only when exactly one valid identity is available; otherwise use the explicit command. Never commit an identity, signing report, certificate export, or private key.
+In certificate-based mode, use your own valid Apple-issued development identity, including its private key in your Keychain. The build requires an explicit certificate SHA-1 through `--identity`. The Finder build launcher may select an identity only when exactly one valid identity is available; otherwise use the explicit command. Never commit an identity, signing report, certificate export, or private key.
 
 The locally signed copy cannot retain OpenAI's team-bound entitlements and provisioning. Sign-in, Keychain access, notifications, shared services, integrations, and updating therefore require manual verification. A local development signature is not OpenAI's signature and does not make the copy notarized for distribution.
 
-The builder is intended to preserve hardened runtime, library validation, and Electron security fuses while rebuilding integrity records and signatures. It must not disable macOS protections to make a build launch.
+The certificate mode preserves hardened runtime, library validation, and Electron security fuses while rebuilding integrity records and signatures.
+
+### Persistent local signing
+
+Glow 0.9.0 provides explicit `--local-signing`. It creates a private self-signed code-signing identity automatically and reuses it across builds. No Apple certificate, paid membership, or publisher signature is required. The identity stays in `~/Library/Application Support/Glow/Signing`, outside the checkout; retain it and never upload its files. A new app version can be rebuilt locally once its integration has been reviewed.
+
+```sh
+"./Refresh Neon Codex.command" --local-signing --prepare-only
+```
+
+Local signing retains hardened runtime, signing flags, Electron fuses, CSP, and archive integrity, but adds `com.apple.security.cs.disable-library-validation` to process executables in the modified copy. **This reduces library-validation protection for that app.** It does not change Gatekeeper, SIP, quarantine, or system-wide settings. Executables with an explicit library-validation flag are refused instead of having that flag cleared. The result is not notarized.
+
+New local builds use schema-4 reports with the certificate pin, persistent signing strategy, and verified designated requirements. Each code requirement binds its identifier to that exact local certificate. Initial Keychain authorization can still be required; subsequent builds using the same identity can retain the grant. Existing schema-3 ad-hoc installations remain valid recovery baselines but are not reused as new builds. Schema-2 Apple certificate mode remains supported. Snapshots keep their original format so rollback remains available. An unrecognized modified app is never adopted as a baseline. Both modes remove vendor team-bound capabilities and need native account/integration validation.
 
 ## Installation
 
 1. Build and review the generated local report.
-2. Open **Install Neon Codex.command** in Finder. The foreground Terminal process must remain open.
+2. Run **Refresh Neon Codex.command --local-signing** in a persistent Terminal window.
 3. Quit ChatGPT with **Command-Q**. Wait for the app and its bundled helpers to exit.
 4. Wait for the installer's completion message, then reopen your usual app.
 5. Complete the [native smoke test](smoke-test.md), especially startup and Settings → Appearance.
@@ -39,28 +51,30 @@ npm run install:theme
 npm run restore
 ```
 
+For local signing, use `"./Refresh Neon Codex.command" --local-signing` in Terminal to complete a prepared installation. Direct installer equivalents require `--allow-local-signing`: `python3 scripts/install.py --check install --allow-local-signing` and `python3 scripts/install.py --wait install --allow-local-signing`. Restore follows the recorded transaction and needs no new local-signing option.
+
 Run a waiting installer from a persistent Terminal window, not from a session hosted inside the app that must quit.
 
 ## One-command refresh
 
-Open **Refresh Neon Codex.command**, or run `npm run refresh` from a persistent Terminal. The command:
+Run `"./Refresh Neon Codex.command" --local-signing`, or `npm run refresh -- --local-signing`, from a persistent Terminal. The command:
 
 1. Checks the installed bundle signature and exact reviewed version.
-2. Reuses a staged build only when its signed contents, installed baseline, theme version, and five runtime source hashes still match.
+2. Checks the retained local identity against recovery history, and reuses staging only when its signing mode, certificate, signed contents, installed baseline, theme version, and runtime source hashes match. Missing or mismatched identity state stops refresh before staging changes.
 3. Otherwise verifies a matching pristine vendor source, preserves the old staging directory, builds and signs a fresh replacement, and runs installation preflight.
 4. Prints **READY**, waits for your manual **Command-Q**, then installs and prints **DONE**. It never quits or reopens the app.
 
 When the current app exactly matches the recorded completed installation and current Glow source, Refresh reports that it is already installed and returns without rebuilding or asking you to quit.
 
-Use `npm run refresh -- --prepare-only` to stop after preparation. Use `--identity YOUR_CERTIFICATE_SHA1` if more than one signing identity is available. Fresh builds can take a few minutes.
+Use `npm run refresh -- --local-signing --prepare-only` to stop after preparation. Use `--identity YOUR_CERTIFICATE_SHA1` if more than one signing identity is available. Fresh builds can take a few minutes.
 
 If a reviewed app update completes while Refresh is waiting, it can rebuild for that version and retry, up to three preparation attempts. Unknown versions, changes within the same version, invalid signatures, or a potentially started installation transaction stop the refresh. Recovery copies are retained. Interrupted transactions must be resolved before staging that they depend on can move.
 
-Refresh is a foreground tool, not a background watcher. App updates can replace Glow until you refresh it. It never changes the updater, downloads an app, weakens version checks, or promises compatibility with a future version. A new version must be inspected and added to the reviewed source manifest before refresh can support it.
+Refresh is a foreground tool, not a background watcher. App updates can replace Glow until you refresh it. It never changes the updater, downloads an app, weakens source checks, or promises compatibility with a future version. A new version must be inspected and added to the reviewed source manifest before refresh can support it. The [compatibility inspector and local repair prompt](compatibility.md) let users investigate a new version themselves; local signing removes the dependency on a new publisher signature, not the need to verify the integration.
 
 ## Restore and updates
 
-Open **Restore Previous Codex.command**, quit ChatGPT fully, and wait for completion before reopening. This restores the bundle present immediately before this installation; it may be an earlier Neon Codex build. Keep the pristine original separately if you need to return to the vendor build.
+Open **Restore Previous Codex.command**, quit ChatGPT fully, and wait for completion before reopening. This restores the bundle present immediately before this installation; it may be an earlier Neon Codex build. Keep the pristine original separately if you need to return to the vendor build. Restore verifies the recorded signer but does not need the local private key.
 
 Restoration swaps the application bundle, not renderer preferences. Versions 0.4–0.7 cannot read the 0.8 preference schema and fall back to their default glow settings after a downgrade. Keep a private preference backup if you need to preserve tuning through a downgrade.
 

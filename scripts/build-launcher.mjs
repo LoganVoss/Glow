@@ -24,7 +24,7 @@ try {
     process.exit(0);
   }
   const readOnly = args.some(value => ['--inspect', '--check-assets', '--self-test-archive'].includes(value));
-  if (!args.includes('--identity') && !readOnly) {
+  if (!args.includes('--identity') && !args.includes('--local-signing') && !readOnly) {
     const listing = execute(process.execPath, [builder, '--list-identities'], { stdio: ['ignore', 'pipe', 'inherit'], encoding: 'utf8' });
     const identities = JSON.parse(listing.stdout);
     if (identities.length !== 1) {
@@ -40,7 +40,9 @@ try {
     execute('npm', ['ci', '--ignore-scripts', '--no-audit', '--no-fund']);
   }
   execute(process.execPath, [builder, ...args]);
-  if (!readOnly) console.log('\nBuild complete. Review the local build report, then open Install Neon Codex.command when ready.');
+  if (!readOnly) console.log(args.includes('--local-signing')
+    ? '\nBuild complete. Review the local build report. To install, run Refresh Neon Codex.command --local-signing in a separate persistent Terminal window.'
+    : '\nBuild complete. Review the local build report, then open Install Neon Codex.command when ready.');
 } catch (error) {
   console.error(`Neon Codex: ${error.message}`);
   process.exitCode = 1;

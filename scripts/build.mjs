@@ -8,10 +8,12 @@
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
+import os from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createHash, X509Certificate, randomUUID } from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
 import assert from 'node:assert/strict';
+import { withLocalIdentity } from './local-identity.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.dirname(HERE);
@@ -30,13 +32,16 @@ for (let i = 0; i < args.length; i++) {
   else if (args[i] === '--self-test-archive') options.selfTestArchive = true;
   else if (args[i] === '--check-identity') options.checkIdentity = true;
   else if (args[i] === '--list-identities') options.listIdentities = true;
+  else if (args[i] === '--local-signing') options.localSigning = true;
   else if (args[i] === '--help') {
-    console.log('Usage: node scripts/build.mjs --identity CERTIFICATE_SHA1 [--source PATH] [--output PATH] [--installed-app PATH] [--asar-module PATH]\n       node scripts/build.mjs --inspect [--source PATH]\n       node scripts/build.mjs --check-identity --identity CERTIFICATE_SHA1\n       node scripts/build.mjs --list-identities\n       node scripts/build.mjs --check-assets [--source PATH]\n       node scripts/build.mjs --self-test-archive\n\nBuilding requires an explicit valid Apple-issued codesigning identity SHA-1. Ad-hoc signing is refused. The identity must be available in your keychain.\n\nRequires macOS and Node 22.12+. Builds a NEW local copy; never overwrites, installs, launches, edits user data, changes fuses, or modifies system protections. Source versions are deliberately pinned in scripts/source-pins.json; new app versions require review. Delete the resulting copy to discard this build.');
+    console.log('Usage: node scripts/build.mjs [--identity CERTIFICATE_SHA1 | --local-signing] [--source PATH] [--output PATH] [--installed-app PATH] [--asar-module PATH]\n       node scripts/build.mjs --inspect [--source PATH]\n       node scripts/build.mjs --check-identity --identity CERTIFICATE_SHA1\n       node scripts/build.mjs --list-identities\n       node scripts/build.mjs --check-assets [--source PATH]\n       node scripts/build.mjs --self-test-archive\n\nDefault builds require an Apple-issued codesigning identity SHA-1. Opt-in --local-signing creates and reuses a private self-signed identity on this Mac. No Apple certificate or membership is required. It adds an app-specific library-validation exception and is not notarized. It never changes system-wide protections or quarantine.\n\nRequires macOS and Node 22.12+. Builds a NEW local copy; never overwrites, installs, launches, edits user data, changes fuses, or modifies system protections. Source versions are deliberately pinned in scripts/source-pins.json; new app versions require review. Delete the resulting copy to discard this build.');
     process.exit(0);
   } else if (args[i] === '--identity' && args[i + 1]) options.identity = args[++i].toUpperCase();
   else if (['--source', '--output', '--installed-app', '--asar-module'].includes(args[i]) && args[i + 1]) options[args[i++].slice(2)] = path.resolve(args[i]);
   else throw new Error(`Unknown or incomplete option: ${args[i]}`);
 }
+if (options.localSigning && options.identity) throw new Error('--local-signing and --identity are mutually exclusive.');
+if (options.localSigning && (options.checkIdentity || options.listIdentities)) throw new Error('Local signing manages its own identity; Apple identity operations cannot be combined with it.');
 if (process.platform !== 'darwin') throw new Error('This build uses macOS ditto, plutil, and codesign.');
 const [nodeMajor, nodeMinor] = process.versions.node.split('.').map(Number);
 if (nodeMajor < 22 || (nodeMajor === 22 && nodeMinor < 12)) throw new Error('Node 22.12 or newer is required.');
@@ -51,7 +56,7 @@ function availableIdentities() {
   return [...available.matchAll(/^\s*\d+\)\s+([0-9A-Fa-f]{40})\s+"([^"\r\n]+)"\s*$/gm)].map(match => ({ sha1: match[1].toUpperCase(), name: match[2] }));
 }
 function validateSigningIdentity(requested = options.identity) {
-  if (!requested) throw new Error('Building requires --identity CERTIFICATE_SHA1. Ad-hoc signing cannot satisfy this app’s hardened-runtime library validation. --inspect remains available without an identity.');
+  if (!requested) throw new Error('Choose --identity CERTIFICATE_SHA1, or explicitly opt into certificate-free --local-signing with its app-specific library-validation exception. --inspect remains available without either.');
   assert.match(requested, /^[0-9A-F]{40}$/, '--identity must be an explicit 40-character certificate SHA-1; ad-hoc signing and identity-name lookup are not accepted');
   const identity = availableIdentities().find(item => item.sha1 === requested);
   assert.ok(identity, 'Requested certificate is not an available valid codesigning identity');
@@ -73,10 +78,30 @@ function signingMetadata(file) {
   const detail = `${result.stdout}\n${result.stderr}`;
   const flagString = detail.match(/\bflags=0x([0-9a-fA-F]+)/)?.[1];
   assert.ok(flagString, `Missing code-signing flags: ${file}`);
-  return { teamIdentifier: detail.match(/^TeamIdentifier=(.+)$/m)?.[1]?.trim(), flags: Number.parseInt(flagString, 16), adHoc: /^Signature=adhoc$/m.test(detail) };
+  return { identifier: detail.match(/^Identifier=(.+)$/m)?.[1]?.trim(), teamIdentifier: detail.match(/^TeamIdentifier=(.+)$/m)?.[1]?.trim(), flags: Number.parseInt(flagString, 16), adHoc: /^Signature=adhoc$/m.test(detail) };
+}
+function localRequirement(identifier, identity) {
+  assert.match(identifier, /^[A-Za-z0-9_.-]+$/, 'Unsupported code signing identifier');
+  assert.match(identity.sha1, /^[0-9A-F]{40}$/, 'Invalid local certificate pin');
+  return `identifier "${identifier}" and certificate leaf = H"${identity.sha1.toLowerCase()}"`;
 }
 function verifySigningTeam(file, identity) {
   const metadata = signingMetadata(file);
+  if (identity.kind === 'local') {
+    assert.equal(metadata.adHoc, false, `Expected persistent local signature: ${file}`);
+    assert.ok(!metadata.teamIdentifier || metadata.teamIdentifier === 'not set', `Unexpected certificate team on local code: ${file}`);
+    const requirement = localRequirement(metadata.identifier, identity);
+    run('/usr/bin/codesign', ['--verify', '--strict', '--test-requirement', `=${requirement}`, file]);
+    const displayed = spawnSync('/usr/bin/codesign', ['--display', '-r-', file], { encoding: 'utf8' });
+    assert.equal(displayed.status, 0, `Cannot inspect designated requirement: ${file}`);
+    const actual = `${displayed.stdout}\n${displayed.stderr}`.match(/^designated => (.+)$/m)?.[1];
+    // codesign omits quotes around simple identifiers when displaying a DR.
+    // Accept only these two terms; never an identifier-only or broader rule.
+    const parts = actual?.match(/^identifier (?:"([A-Za-z0-9_.-]+)"|([A-Za-z0-9_.-]+)) and certificate (?:leaf|0) = H"([0-9a-fA-F]{40})"$/);
+    assert.ok(parts && (parts[1] || parts[2]) === metadata.identifier && parts[3].toUpperCase() === identity.sha1,
+      `Local designated requirement is not pinned to the signing certificate and identifier: ${file}`);
+    return metadata;
+  }
   assert.ok(metadata.teamIdentifier && metadata.teamIdentifier !== 'not set', `Signed code has no Team Identifier: ${file}`);
   assert.equal(metadata.teamIdentifier, identity.teamIdentifier, `Signed code Team Identifier mismatch: ${file}`);
   assert.equal(metadata.adHoc, false, `Ad-hoc code is not allowed: ${file}`);
@@ -184,18 +209,45 @@ function readEntitlements(file) {
 function sanitizeEntitlements(value) {
   return Object.fromEntries(Object.entries(value).filter(([key]) => !key.startsWith('com.apple.developer.') && !['com.apple.application-identifier', 'application-identifier', 'keychain-access-groups', 'com.apple.security.application-groups'].includes(key)));
 }
+function executableCode(file) {
+  let executable = file;
+  if (fs.statSync(file).isDirectory()) {
+    const infoPath = ['Contents/Info.plist', 'Resources/Info.plist', 'Versions/Current/Resources/Info.plist']
+      .map(relative => path.join(file, relative)).find(candidate => fs.existsSync(candidate));
+    assert.ok(infoPath, `Cannot inspect signing bundle metadata: ${file}`);
+    const name = plist(infoPath).CFBundleExecutable;
+    assert.ok(typeof name === 'string' && name && !name.includes('/'), 'Invalid bundle executable');
+    executable = [path.join(file, 'Contents/MacOS', name), path.join(file, name)]
+      .find(candidate => fs.existsSync(candidate));
+    assert.ok(executable, `Bundle executable is missing: ${file}`);
+  }
+  return /Mach-O[^\n]*executable/.test(run('/usr/bin/file', ['-b', executable]));
+}
 function makePlist(value) { return run('/usr/bin/plutil', ['-convert', 'xml1', '-o', '-', '--', '-'], { input: JSON.stringify(value) }); }
 async function signOne(file, scratch, report, identity) {
   const beforeSignature = signingMetadata(file);
   const entitlements = readEntitlements(file);
   const safe = sanitizeEntitlements(entitlements);
+  const isExecutable = executableCode(file);
+  const localExecutable = identity.kind === 'local' && isExecutable;
+  if (localExecutable) {
+    assert.equal(beforeSignature.flags & 0x2000, 0, `Explicit library validation cannot be preserved with local signing: ${file}`);
+    safe['com.apple.security.cs.disable-library-validation'] = true;
+  }
   const removed = Object.keys(entitlements).filter(key => !(key in safe));
   const entitlementPath = path.join(scratch, 'signing-entitlements.plist');
   await fsp.writeFile(entitlementPath, makePlist(safe));
-  run('/usr/bin/codesign', ['--force', '--sign', identity.sha1, '--timestamp=none', '--preserve-metadata=flags,runtime', '--entitlements', entitlementPath, file]);
+  // macOS 15 (Darwin 24) stopped embedding library entitlements by default.
+  // Preserve existing sanitized entitlements, without granting new ones to
+  // libraries. Older codesign versions embed these without the new flag.
+  const libraryEntitlementArgs = !isExecutable && Object.keys(safe).length && Number.parseInt(os.release(), 10) >= 24 ? ['--force-library-entitlements'] : [];
+  const localIdentityArgs = identity.kind === 'local' ? ['--keychain', identity.keychainPath, '--identifier', beforeSignature.identifier, '--requirements', `=designated => ${localRequirement(beforeSignature.identifier, identity)}`] : [];
+  run('/usr/bin/codesign', ['--force', '--sign', identity.sha1, '--timestamp=none', '--preserve-metadata=flags,runtime', ...localIdentityArgs, ...libraryEntitlementArgs, '--entitlements', entitlementPath, file]);
   const afterSignature = verifySigningTeam(file, identity);
+  if (identity.kind === 'local') assert.equal(afterSignature.identifier, beforeSignature.identifier, `Code signing identifier changed: ${file}`);
   assert.equal(afterSignature.flags & ~2, beforeSignature.flags & ~2, `Code-signing security flags changed: ${file}`);
-  report.push({ path: path.relative(options.output, file), removedEntitlements: removed, teamIdentifier: afterSignature.teamIdentifier, flags: afterSignature.flags });
+  assert.deepEqual(readEntitlements(file), safe, `Signed entitlements differ from the intended policy: ${file}`);
+  report.push({ path: path.relative(options.output, file), removedEntitlements: removed, teamIdentifier: afterSignature.teamIdentifier, flags: afterSignature.flags, adHoc: afterSignature.adHoc, libraryValidationException: localExecutable, entitlements: safe });
 }
 function bundleSnapshot(app) {
   return JSON.parse(run('/usr/bin/python3', [path.join(HERE, 'install.py'), '--snapshot', app]));
@@ -298,7 +350,8 @@ async function main() {
   }
   if (options.selfTestArchive) { await selfTestArchive(await loadAsar()); return; }
   // Validate before any source read, clone, output write, or signing operation.
-  const signingIdentity = (options.inspect || options.checkAssets) && !options.checkIdentity ? null : validateSigningIdentity();
+  const signingIdentity = (options.inspect || options.checkAssets) && !options.checkIdentity ? null
+    : options.localSigning ? null : validateSigningIdentity();
   if (options.checkIdentity) { console.log(JSON.stringify({ signingIdentity, readOnly: true }, null, 2)); return; }
   const asar = await loadAsar();
   // Choose only a reviewed build. A stale cache must never select an older
@@ -348,9 +401,14 @@ async function main() {
   assert.equal(installedBaseline.bundleIdentifier, PIN.bundle, 'Installed baseline must be Codex');
   assert.equal(installedBaseline.version, PIN.version, 'Installed Codex version changed');
   assert.equal(installedBaseline.build, PIN.build, 'Installed Codex build changed');
-  assert.ok(installedBaseline.signature.teamIdentifier && installedBaseline.signature.teamIdentifier !== 'not set' && !installedBaseline.signature.adHoc, 'Installed baseline must have a certificate signature');
-  assert.equal(installedBaseline.frameworkSignature.teamIdentifier, installedBaseline.signature.teamIdentifier, 'Installed launcher and framework signing teams differ');
-  for (const metadata of [installedBaseline.signature, installedBaseline.frameworkSignature]) assert.ok(!metadata.adHoc && (metadata.flags & 0x10000), 'Installed app must retain certificate signing and hardened runtime');
+  if (installedBaseline.signature.adHoc || !installedBaseline.signature.teamIdentifier || installedBaseline.signature.teamIdentifier === 'not set') {
+    run('/usr/bin/python3', [path.join(HERE, 'install.py'), '--verify-local-baseline', installedApp]);
+  } else {
+    assert.ok(installedBaseline.signature.teamIdentifier && installedBaseline.signature.teamIdentifier !== 'not set', 'Installed baseline must have a certificate signature');
+    assert.equal(installedBaseline.frameworkSignature.teamIdentifier, installedBaseline.signature.teamIdentifier, 'Installed launcher and framework signing teams differ');
+    assert.ok(!installedBaseline.frameworkSignature.adHoc, 'Installed framework must have a certificate signature');
+  }
+  for (const metadata of [installedBaseline.signature, installedBaseline.frameworkSignature]) assert.ok(metadata.flags & 0x10000, 'Installed app must retain hardened runtime');
   assert.ok(!originalCSS.includes(Buffer.from(MARKER)), 'Source is already patched');
   const destination = path.resolve(options.output);
   if (fs.existsSync(destination)) throw new Error('Output already exists. Choose a new --output directory; this builder never overwrites an app.');
@@ -361,10 +419,12 @@ async function main() {
   assert.ok(realParent !== '/Applications' && !realParent.startsWith('/Applications/'), 'Refusing to write into /Applications');
   assert.ok(realParent !== source && !realParent.startsWith(`${source}/`), 'Output cannot be inside the original app');
   assert.notEqual(path.join(realParent, path.basename(destination)), source, 'Output cannot replace the source');
+  async function buildWithIdentity(signingIdentity) {
+  if (options.localSigning) console.log('LOCAL SIGNING: reusing a private signing identity generated on this Mac; no Apple certificate or membership is required. The modified app gets an app-specific library-validation exception and is not notarized. Initial Keychain authorization may be required.');
   console.log(`Verified source ${PIN.version} (${PIN.build}); building a separate local copy.`);
   run('/usr/bin/ditto', [source, destination]);
   const scratch = await fsp.mkdtemp(path.join(realParent, '.neon-codex-build-'));
-  const report = { schemaVersion: 2, buildId: randomUUID(), themeVersion: THEME_VERSION, ...description, installedBaseline, output: destination, sourceAssets: assets.sourceAssets, copiedAt: new Date().toISOString(), signingIdentity, signed: [], unpackedIntegrityChanges: [], launched: false, notarized: false };
+  const report = { schemaVersion: options.localSigning ? 4 : 2, signingMode: options.localSigning ? 'local' : 'certificate', localSigningStrategy: options.localSigning ? 'persistent-self-signed' : undefined, libraryValidationException: Boolean(options.localSigning), buildId: randomUUID(), themeVersion: THEME_VERSION, ...description, installedBaseline, output: destination, sourceAssets: assets.sourceAssets, copiedAt: new Date().toISOString(), signingIdentity, signed: [], unpackedIntegrityChanges: [], launched: false, notarized: false };
   try {
     // OpenAI team-bound provisioning does not apply to a copy signed by another developer.
     const tree = await walk(destination);
@@ -374,8 +434,8 @@ async function main() {
     const binaries = [];
     for (const file of tree.files) if (!provisionProfiles.includes(file) && await isMachO(file)) binaries.push(file);
     const bundles = tree.dirs.filter(file => /\.(app|framework|xpc|appex|bundle|plugin|docktileplugin)$/.test(file) && binaries.some(binary => binary.startsWith(file + path.sep)));
-    // Sign from inner code to outer bundle. This keeps hardened-runtime flags;
-    // no debug, unsigned-loading, or library-validation exceptions are added.
+    // Sign from inner code to outer bundle; preserve hardened-runtime flags.
+    // Local mode opts process executables out of implicit library validation only.
     for (const file of binaries.sort((a, b) => b.length - a.length)) await signOne(file, scratch, report.signed, signingIdentity);
     const header = structuredClone(original.header);
     const sourceEntries = flatten(original.header);
@@ -428,9 +488,13 @@ async function main() {
     for (const relative of new Set(report.signed.map(item => item.path))) {
       const signedPath = path.resolve(destination, relative);
       verifySigningTeam(signedPath, signingIdentity);
+      const expectedPolicy = [...report.signed].reverse().find(item => item.path === relative);
+      assert.deepEqual(readEntitlements(signedPath), expectedPolicy.entitlements, `Final entitlements changed: ${signedPath}`);
       run('/usr/bin/codesign', ['--verify', '--strict', signedPath]);
     }
-    report.signingTeamVerified = true;
+    report.signingTeamVerified = !options.localSigning;
+    report.signingPolicyVerified = true;
+    if (options.localSigning) report.stableIdentityVerified = true;
     const afterFramework = await fsp.readFile(outFramework);
     const finalFrameworkState = inspectFramework(afterFramework, updatedInfo.ElectronAsarIntegrity);
     assert.deepEqual(finalFrameworkState.fuses, frameworkState.fuses, 'Electron fuses changed');
@@ -453,13 +517,19 @@ async function main() {
     assert.deepEqual(bundleSnapshot(installedApp), installedBaseline, 'Installed app changed while building; rebuild against the current baseline');
     report.installedBaselineUnchanged = true;
     report.runtimeValidated = false;
-    report.limitations = ['This local copy is signed by the explicitly selected Apple-issued development/distribution identity, not OpenAI; it is not notarized.', 'App behavior, sign-in, updates, keychain, notifications, and integrations are untested; team-bound capabilities were removed from the copy.', 'The copy retains the original bundle identity. No user-data isolation or launch has been performed.', 'This is a version-specific local modification, not a supported Codex plugin API.', 'Native Appearance mounting and controls require manual runtime verification after installation.'];
+    report.limitations = [options.localSigning ? 'This local copy uses a persistent self-signed identity generated on this Mac, not an Apple-issued certificate. Process executables have an app-specific library-validation exception; system-wide protections and quarantine are unchanged. It is not notarized. Initial Keychain authorization may be needed. Retain the local identity to preserve code identity across refreshes; loss, rotation, expiry, or policy changes can require reauthorization.' : 'This local copy is signed by the explicitly selected Apple-issued development/distribution identity, not OpenAI; it is not notarized.', 'App behavior, sign-in, updates, keychain, notifications, and integrations are untested; team-bound capabilities were removed from the copy.', 'The copy retains the original bundle identity. No user-data isolation or launch has been performed.', 'This is a version-specific local modification, not a supported Codex plugin API.', 'Native Appearance mounting and controls require manual runtime verification after installation.'];
     const reportFile = `${destination}.build-report.json`;
     await fsp.writeFile(reportFile, JSON.stringify(report, null, 2) + '\n');
-    console.log(JSON.stringify({ output: destination, report: reportFile, originalUnchanged: true, signatureVerified: true, signingIdentity: signingIdentity.name, signingTeamIdentifier: signingIdentity.teamIdentifier, signingTeamVerified: true, runtimeValidated: false, unpackedSignatureIntegrityUpdates: report.unpackedIntegrityChanges.length, theme: 'Neon Codex', themeVersion: THEME_VERSION, installedBaselineRecorded: true, cspPreserved: true }, null, 2));
+    console.log(JSON.stringify({ output: destination, report: reportFile, originalUnchanged: true, signatureVerified: true, signingIdentity: signingIdentity.name, signingTeamIdentifier: signingIdentity.teamIdentifier, signingTeamVerified: report.signingTeamVerified, signingMode: report.signingMode, signingPolicyVerified: true, libraryValidationException: report.libraryValidationException, runtimeValidated: false, unpackedSignatureIntegrityUpdates: report.unpackedIntegrityChanges.length, theme: 'Neon Codex', themeVersion: THEME_VERSION, installedBaselineRecorded: true, cspPreserved: true }, null, 2));
   } catch (error) {
     console.error(`Build failed. The installed source was not edited. The incomplete copy remains at ${destination}; it has not been launched.`);
     throw error;
   } finally { await fsp.rm(scratch, { recursive: true, force: true }); }
+  }
+  if (options.localSigning) {
+    const { sha1: expectedSha1 } = JSON.parse(run('/usr/bin/python3', [path.join(HERE, 'install.py'), '--local-identity-pin']));
+    return withLocalIdentity(buildWithIdentity, { expectedSha1: expectedSha1 || undefined });
+  }
+  return buildWithIdentity(signingIdentity);
 }
 main().catch(error => { console.error(error.message); process.exitCode = 1; });

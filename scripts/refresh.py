@@ -33,7 +33,7 @@ def reviewed_snapshot():
     value = installer.snapshot(installer.APP)
     if value.get('bundleIdentifier') != 'com.openai.codex':
         raise RuntimeError('Expected the Codex app bundle identity.')
-    installer.require_certificate(value, 'Installed app')
+    installer.require_installed_signature(value, 'Installed app')
     pins = json.loads(PINS.read_text())
     key = version_key(value)
     pin = pins.get(key)
@@ -112,6 +112,28 @@ def validate_identity(identity):
     return identity
 
 
+def inspect_local_identity(expected_sha1):
+    """Check retained signing state before reusing a build, without generating keys."""
+    result = subprocess.run(['node', str(ROOT / 'scripts/local-identity.mjs'), '--inspect',
+                             '--expected-sha1', expected_sha1],
+                            cwd=ROOT, text=True, capture_output=True, check=False)
+    if result.returncode:
+        detail = (result.stderr or result.stdout or '').strip()
+        raise RuntimeError(f'Glow local signing identity is unavailable or changed: {detail}')
+    identity = json.loads(result.stdout)
+    if identity.get('sha1') != expected_sha1:
+        raise RuntimeError('Glow local signing identity differs from the recorded certificate; refusing key rotation.')
+    return identity
+
+
+def validate_retained_local_identity(report):
+    expected = installer.local_identity_pin()
+    sha1 = report['signingIdentity']['sha1']
+    if expected is not None and sha1 != expected:
+        raise RuntimeError('The staged local certificate differs from recovery history; refusing key rotation.')
+    inspect_local_identity(sha1)
+
+
 def inspect_source(source, expected):
     installer.real_directory(source)
     build_command('--inspect', '--source', source, quiet=True)
@@ -181,13 +203,20 @@ def staged_report():
     report = json.loads(installer.REPORT.read_text())
     # Never silently rebuild over a corrupted, supposedly verified replacement.
     # Incomplete output is preserved as stale staging after source validation.
-    if report.get('schemaVersion') == 2 and all(report.get(key) is True for key in installer.VERIFICATIONS):
+    if installer.report_verified(report):
         staged = installer.snapshot(installer.STAGED)
         installer.require_snapshot(staged, report['stagedSnapshot'], 'Staged app')
-        team = installer.require_certificate(staged, 'Staged app')
-        if team != report.get('signingIdentity', {}).get('teamIdentifier'):
-            raise RuntimeError('Staged signature differs from the selected signing certificate.')
+        if installer.report_is_local(report):
+            # Read-only validation of old staging is safe in either mode. Mode
+            # selection below decides whether it may be reused for installation.
+            installer.require_report_signature(staged, report, 'Staged app', allow_local_signing=True)
+        else:
+            team = installer.require_certificate(staged, 'Staged app')
+            if team != (report.get('signingIdentity') or {}).get('teamIdentifier'):
+                raise RuntimeError('Staged signature differs from the selected signing certificate.')
         return report
+    if report.get('schemaVersion') in (3, 4):
+        raise RuntimeError('The local staged build has not passed all required signing-policy checks.')
     return None
 
 
@@ -207,21 +236,28 @@ def archive_staging():
     print(f'Previous staged build preserved in {destination.relative_to(ROOT)}', flush=True)
 
 
-def already_installed(baseline, theme_version, assets, identity):
+def matches_signing_mode(report, local_signing):
+    return installer.report_is_stable_local(report) if local_signing else report.get('schemaVersion') == 2
+
+
+def already_installed(baseline, theme_version, assets, identity, local_signing=False):
     safe_path(installer.LATEST)
     if not installer.LATEST.exists():
         return None
     record_file, record = installer.recovery_record()
     report = record.get('buildReport', {})
     if (record.get('state') != 'installed' or record.get('target') != str(installer.APP)
-            or report.get('schemaVersion') != 2
-            or not all(report.get(key) is True for key in installer.VERIFICATIONS)
+            or not installer.report_verified(report)
+            or not matches_signing_mode(report, local_signing)
             or report.get('themeVersion') != theme_version or report.get('sourceAssets') != assets
             or installer.comparable(record.get('replacement', {})) != installer.comparable(baseline)
             or installer.comparable(report.get('stagedSnapshot', {})) != installer.comparable(baseline)
-            or (identity and report.get('signingIdentity', {}).get('sha1') != identity)):
+            or (identity and (report.get('signingIdentity') or {}).get('sha1') != identity)):
         return None
-    if installer.require_certificate(baseline, 'Installed app') != report.get('signingIdentity', {}).get('teamIdentifier'):
+    if local_signing:
+        validate_retained_local_identity(report)
+        installer.require_report_signature(baseline, report, 'Installed app', allow_local_signing=True)
+    elif installer.require_certificate(baseline, 'Installed app') != (report.get('signingIdentity') or {}).get('teamIdentifier'):
         raise RuntimeError('Installed Glow signature differs from its recorded signing certificate.')
     safe_path(installer.STAGED.parent, directory=True)
     safe_path(installer.STAGED, directory=True)
@@ -238,20 +274,34 @@ def already_installed(baseline, theme_version, assets, identity):
     return {'alreadyInstalled': True, 'buildId': record['buildId'], 'themeVersion': theme_version}
 
 
-def prepare(identity=None, baseline=None):
+def install_preflight(local_signing=False):
+    # Preserve the legacy invocation for existing certificate integrations.
+    return (installer.preflight('install', allow_local_signing=True) if local_signing
+            else installer.preflight('install'))
+
+
+def prepare(identity=None, baseline=None, local_signing=False):
+    if identity and local_signing:
+        raise RuntimeError('--identity and --local-signing are mutually exclusive.')
     # Reject unsupported versions before creating a lock, cache, or archive.
     baseline = baseline or reviewed_snapshot()
     theme_version, assets = theme_inputs()
     identity = validate_identity(identity)
+    if local_signing:
+        retained_pin = installer.local_identity_pin()
+        if retained_pin is not None:
+            inspect_local_identity(retained_pin)
     with existing_lock():
-        installed = already_installed(baseline, theme_version, assets, identity)
+        installed = already_installed(baseline, theme_version, assets, identity, local_signing)
         if installed:
             return installed
     with preparation_lock():
         installer.require_snapshot(reviewed_snapshot(), baseline, 'Installed app before refresh')
         report = staged_report()
-        if report and report.get('themeVersion') == theme_version and report.get('sourceAssets') == assets and installer.comparable(report.get('installedBaseline', {})) == installer.comparable(baseline) and (not identity or report.get('signingIdentity', {}).get('sha1') == identity):
-            installer.preflight('install')
+        if report and matches_signing_mode(report, local_signing) and report.get('themeVersion') == theme_version and report.get('sourceAssets') == assets and installer.comparable(report.get('installedBaseline', {})) == installer.comparable(baseline) and (not identity or (report.get('signingIdentity') or {}).get('sha1') == identity):
+            if local_signing:
+                validate_retained_local_identity(report)
+            install_preflight(local_signing)
             print(f'Glow {theme_version} is already prepared for Codex {baseline["version"]} (build {baseline["build"]}).', flush=True)
             return report
         guard_recovery()
@@ -261,22 +311,27 @@ def prepare(identity=None, baseline=None):
         arguments = ['--source', source, '--output', installer.STAGED, '--installed-app', installer.APP]
         if identity:
             arguments.extend(['--identity', identity])
+        if local_signing:
+            arguments.append('--local-signing')
         print(f'Preparing Glow {theme_version} for Codex {baseline["version"]} (build {baseline["build"]})...', flush=True)
         build_command(*arguments)
-        installer.preflight('install')
+        install_preflight(local_signing)
         report = json.loads(installer.REPORT.read_text())
-        if report.get('themeVersion') != theme_version or report.get('sourceAssets') != assets:
+        if (report.get('themeVersion') != theme_version or report.get('sourceAssets') != assets
+                or not matches_signing_mode(report, local_signing)):
             raise RuntimeError('The generated build does not match the current Glow source files; no installation was attempted.')
         print('Signed build and installation checks passed.', flush=True)
         return report
 
 
-def refresh(prepare_only=False, identity=None, timeout=1800):
+def refresh(prepare_only=False, identity=None, timeout=1800, local_signing=False):
+    if identity and local_signing:
+        raise RuntimeError('--identity and --local-signing are mutually exclusive.')
     for attempt in range(MAX_ATTEMPTS):
         baseline = reviewed_snapshot()
         report = None
         try:
-            report = prepare(identity=identity, baseline=baseline)
+            report = prepare(identity=identity, baseline=baseline, local_signing=local_signing)
             if report.get('alreadyInstalled'):
                 return
             if prepare_only:
@@ -284,7 +339,10 @@ def refresh(prepare_only=False, identity=None, timeout=1800):
                 return
             # Release the preparation lock before entering the installer's own
             # locked, journaled manual-quit flow. It revalidates all snapshots.
-            installer.wait_and_swap('install', timeout)
+            if local_signing:
+                installer.wait_and_swap('install', timeout, allow_local_signing=True)
+            else:
+                installer.wait_and_swap('install', timeout)
             return
         except (RuntimeError, OSError, subprocess.SubprocessError) as error:
             if report and (installer.RECOVERY / report['buildId'] / 'record.json').exists():
@@ -302,13 +360,15 @@ def refresh(prepare_only=False, identity=None, timeout=1800):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--prepare-only', action='store_true', help='Prepare and check the signed build without waiting or installing')
-    parser.add_argument('--identity', help='Select an Apple-issued signing certificate by SHA-1')
+    signing = parser.add_mutually_exclusive_group()
+    signing.add_argument('--identity', help='Select an Apple-issued signing certificate by SHA-1')
+    signing.add_argument('--local-signing', action='store_true', help='Use a persistent local signing identity, without an Apple certificate, with an app-scoped library-validation exception')
     parser.add_argument('--timeout', type=int, default=1800, help='Seconds to wait for a manual quit (default: 1800)')
     args = parser.parse_args()
     if args.timeout <= 0:
         parser.error('--timeout must be positive')
     try:
-        refresh(args.prepare_only, args.identity, args.timeout)
+        refresh(args.prepare_only, args.identity, args.timeout, local_signing=args.local_signing)
     except KeyboardInterrupt:
         print('\nCancelled. No app was stopped or launched. Check the recovery record if installation had started.', file=sys.stderr)
         return 130

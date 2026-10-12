@@ -1,50 +1,43 @@
 # Install Glow
 
-Glow builds a locally signed copy of your installed app, then replaces the app after you quit it. The source is public; application bundles and signing certificates are not included.
+Glow 0.9.0 builds and signs a local copy of your app, then replaces the app after you quit. Its border and controls live in **Settings → Appearance → Glow**. No Apple Developer membership, Apple-issued certificate, or signature from Glow's publisher is required.
 
-For guided setup, use the copy-and-paste prompt in the [README](../README.md). It requires an assistant with terminal access to your Mac. These are the equivalent manual steps.
+This is an experimental local modification, not a notarized distribution. See [verification](verification.md) for what has actually been tested.
 
 ## Requirements
 
-| Requirement | Supported configuration |
+| Requirement | Configuration |
 | --- | --- |
 | Mac | Apple silicon, macOS |
 | Installed app | `/Applications/ChatGPT.app`, bundle identifier `com.openai.codex` |
-| Reviewed app versions | **26.1007.30912 (20156)** or **26.1007.21159 (20052)** |
-| Build tools | Node.js **22.12+**, npm, Git, Python 3 at `/usr/bin/python3`, and macOS command-line tools |
-| Signing | Your own valid Apple-issued code-signing certificate **and its private key**, available in Keychain |
-| Location | A local checkout on the same filesystem as `/Applications`, with permission to replace the installed app |
+| Reviewed sources | **26.1007.30912 (20156)** or **26.1007.21159 (20052)** |
+| Build tools | Node.js **22.12+**, npm, Git, Python 3, and Apple's command-line tools |
+| Signing | Generated automatically on this Mac with explicit `--local-signing` |
+| Location | Checkout on the same filesystem as the app, with permission to replace it |
 
-The exact reviewed versions live in [source-pins.json](../scripts/source-pins.json). An unknown version stops before patching. Renaming another app or changing a version number does not make it compatible.
+The installer does not request administrator privileges. New app versions need a [structural compatibility review](compatibility.md); changing only a version or hash is insufficient.
 
-The installer does not request administrator privileges. Keep the checkout at `~/Glow` on your internal disk and retain its `.local/` folder; it contains the verified original, prepared builds, and recovery copies.
+## Prepare
 
-## First installation
-
-Open **Terminal** and download the source:
+For a new checkout:
 
 ```sh
 git clone https://github.com/LoganVoss/Glow.git "$HOME/Glow"
 cd "$HOME/Glow"
 npm ci --ignore-scripts --no-audit --no-fund
+"./Refresh Neon Codex.command" --local-signing --prepare-only
 ```
 
-If you already have this checkout, use the [update steps](#after-an-app-update) instead of cloning over it.
+Use an existing checkout when available. Never clone over it or discard its `.local/` backups.
 
-Prepare and verify the build:
+Preparation verifies the OpenAI-signed source, preserves an original, builds Glow, signs with your persistent local identity, and checks installation. It can take a few minutes. **`READY. Preparation complete` means your installed app has not changed.** A local assistant can perform this step.
 
-```sh
-"$HOME/Glow/Refresh Neon Codex.command" --prepare-only
-```
+## Finish in Terminal
 
-This checks your app, preserves a verified unmodified source, builds Glow, signs the result, and runs installation checks. It selects a certificate automatically only when exactly one valid identity is available. See [signing setup](#signing-setup) if it cannot select one.
-
-Preparation can take a few minutes. **`READY. Preparation complete` means your installed app has not changed.** You can run this preparation step from a locally connected assistant.
-
-To finish, run the following yourself in a persistent **Terminal window**:
+Run this in a separate, persistent **Terminal window**:
 
 ```sh
-"$HOME/Glow/Refresh Neon Codex.command"
+"$HOME/Glow/Refresh Neon Codex.command" --local-signing
 ```
 
 1. Wait for **READY** and the instruction to quit.
@@ -52,50 +45,47 @@ To finish, run the following yourself in a persistent **Terminal window**:
 3. Keep Terminal open until **DONE**.
 4. Reopen your usual app and go to **Settings → Appearance → Glow**.
 
-Do not run this waiting step inside the app that must quit. The installer never quits or reopens the app for you. If the current Glow build is already installed and matches the source, Refresh reports that no change is needed.
+The installer does not quit or reopen the app. Do not start this waiting step from a chat hosted inside the app that must quit. Complete the [native smoke test](smoke-test.md), including account features and a subsequent relaunch.
 
-Check startup, your normal account features, and the Appearance controls after installation. The [native smoke test](smoke-test.md) gives the full checklist; a successful build alone does not establish native compatibility.
+## Keychain and your local identity
 
-## Signing setup
+Glow creates a unique self-signed code-signing identity under:
 
-You need a valid Apple-issued signing identity with its private key in your Mac's Keychain. An Apple Development identity is suitable for the local build. The project does not provide certificates and does not use ad-hoc signing.
-
-Use Apple's instructions to [create and manage signing certificates in Xcode](https://help.apple.com/xcode/mac/current/en.lproj/dev154b28f09.html). Installing the command-line tools alone does not create a signing identity.
-
-List the identities the builder accepts:
-
-```sh
-cd "$HOME/Glow"
-node scripts/build.mjs --list-identities
+```text
+~/Library/Application Support/Glow/Signing
 ```
 
-If several are listed, select your certificate by replacing `YOUR_CERTIFICATE_SHA1` with its 40-character SHA-1:
+This identity is generated locally; it is **not an Apple-issued certificate** and needs no Apple account. Keep this private folder. It lives outside the Git checkout so pulling updates or re-cloning the source does not replace it. Never upload it, include it in issue attachments, or share it between users.
 
-```sh
-"$HOME/Glow/Refresh Neon Codex.command" --prepare-only --identity YOUR_CERTIFICATE_SHA1
-```
+Each signed code component has a designated requirement bound to its identifier and that exact certificate. Rebuilt versions can therefore satisfy the same identity requirement even when their executable code changes. A different signing key cannot gain access just by using the same app name. [Apple's code identity documentation](https://developer.apple.com/library/archive/documentation/Security/Conceptual/CodeSigningGuide/Procedures/Procedures.html)
 
-Use the same `--identity YOUR_CERTIFICATE_SHA1` option on the final Refresh command. Keep certificate exports, private keys, and full signing output private.
+**On the first switch**, macOS may ask to let ChatGPT access **“Codex Storage Key”** in your login Keychain. This includes migration from an older Apple-signed or ad-hoc Glow build. Review the system dialog yourself. **Allow** grants the current request; **Always Allow** remembers authorization for that app identity. Reusing the same identity is designed to preserve that authorization across Glow refreshes. [Apple's authorization choices](https://support.apple.com/guide/keychain-access/kyca1243/mac)
 
-Local signing replaces OpenAI's signature and removes capabilities tied to OpenAI's signing team. The result is not notarized for distribution. Sign-in, Keychain access, notifications, integrations, and updating require manual verification. The builder preserves hardened runtime, library validation, and Electron security fuses.
+This does not promise that macOS will never ask again. Losing or replacing the local identity, certificate expiry, changed access requests, or macOS/managed-device policy can require reauthorization. Glow stops if recorded identity state is missing or mismatched instead of silently rotating the key. Ordinary app updates can still remove the appearance patch until you refresh it.
+
+The installer does not read the actual Codex storage secret, enter your login password, edit the item's access list, or grant access to arbitrary apps. Initial authorization remains a macOS decision. [Why modified apps may need authorization again](https://support.apple.com/guide/keychain-access/kyca1331/mac)
+
+## Security tradeoff
+
+Both signing modes replace OpenAI's signature and remove capabilities tied to OpenAI's signing team. Local signing also adds an app-scoped **library-validation exception** so libraries signed by your local identity can load. This reduces that protection for the modified app.
+
+Hardened-runtime flags, Electron fuses, CSP, and archive integrity remain checked. Glow does not disable SIP or Gatekeeper, change system trust, or remove quarantine. The result is not notarized; macOS or managed-device policy may prevent it from launching. Restore the previous bundle if it fails rather than disabling system protections. Startup, Keychain, account services, notifications, integrations, and updater behavior require native testing.
 
 ## After an app update
 
-An app update can replace Glow. **There is no background reinstallation or guaranteed uninterrupted glow across updates.** Once the update finishes, get the latest Glow source and refresh:
+Keep both your `.local/` recovery folder and your private signing identity. Update a clean checkout with `git pull --ff-only`, preserving any local edits, then run `npm ci --ignore-scripts --no-audit --no-fund`.
+
+Prepare again:
 
 ```sh
-cd "$HOME/Glow" && git pull --ff-only && \
-  npm ci --ignore-scripts --no-audit --no-fund && \
-  "./Refresh Neon Codex.command"
+"$HOME/Glow/Refresh Neon Codex.command" --local-signing --prepare-only
 ```
 
-Continue only if the source and dependency updates succeed. Then follow the same **READY → Command-Q → DONE → reopen** sequence. Use `--identity YOUR_CERTIFICATE_SHA1` if you need to select a certificate explicitly.
+Then finish in Terminal with the same command without `--prepare-only`, following **READY → Command-Q → DONE → reopen**. Refresh preserves Glow preferences, reuses your local identity, and does not downgrade the app or alter its updater.
 
-Refresh checks the currently installed version and prepares the matching build. It preserves old staging and recovery files and leaves your saved Glow preferences in place. It does not downgrade the app or change its updater.
+If the version is unreviewed, use the [compatibility check and copyable repair prompt](compatibility.md). Your local assistant can inspect and adapt the integration without waiting for a publisher-signed package. A structural candidate still requires review and validation. An app update that arrives during installation is rechecked before any swap.
 
-If the new app version **has not been reviewed**, Refresh stops without patching it. Wait for a compatible Glow update, then run these steps again. Do not bypass version, hash, signature, or recovery checks. If an update completes while Refresh is waiting, it can retry for a reviewed version; unsupported changes still stop safely.
-
-## Restore the previous app
+## Restore
 
 From the same checkout in Terminal:
 
@@ -103,24 +93,32 @@ From the same checkout in Terminal:
 "$HOME/Glow/Restore Previous Codex.command"
 ```
 
-Follow its quit-and-wait instructions, wait for completion, then reopen. This restores the **bundle installed immediately before the last Glow installation**. It may be an earlier Glow build. The untouched vendor source is preserved separately under `.local/originals/`.
+Follow its quit-and-wait instructions, then reopen. This restores the bundle installed immediately before the latest Glow installation; it may be an earlier Glow build. It does not erase saved preferences or your signing identity. A pristine vendor original is retained separately in `.local/originals/`. Keep recovery records even if a build fails.
 
-Restoration changes the application bundle, not your saved renderer preferences. Keep `.local/` until you no longer need recovery. See [build and restore details](build-and-restore.md) for source selection and interrupted transactions.
+## Optional Apple certificate mode
+
+Existing users may still choose an Apple-issued identity from Keychain:
+
+```sh
+node scripts/build.mjs --list-identities
+"./Refresh Neon Codex.command" --prepare-only --identity YOUR_CERTIFICATE_SHA1
+```
+
+Finish in Terminal with the same identity and without `--prepare-only`. Do not combine `--identity` and `--local-signing`. Apple certificate mode retains library validation but still replaces OpenAI's identity and is not notarized by this project.
 
 ## Troubleshooting
 
 | Message or symptom | Next step |
 | --- | --- |
-| App version has not been reviewed | Update this repository. If your version is still absent from `source-pins.json`, wait for compatibility support. |
-| Installed app differs from the recorded build snapshot | Run **Refresh**, which prepares against the current reviewed app. Do not reuse the old Install command or edit the snapshot. |
-| No valid signing identity | Add your Apple-issued certificate and its private key to Keychain using the signing instructions above. |
-| More than one valid signing identity | List accepted identities and pass your choice using `--identity`. |
-| `node` or `npm` not found, or Node is too old | Install Node.js 22.12 or later and reopen Terminal. |
-| Git, Python, or macOS build tools are missing | Install Apple's command-line tools with `xcode-select --install`, finish the installation, then retry. |
-| Atomic exchange requires the same filesystem | Use a checkout on the app's filesystem, normally `~/Glow` on the internal disk. Retain any existing `.local/` recovery files. |
-| Permission denied when replacing the app | Confirm your Mac account can replace `/Applications/ChatGPT.app`. On a managed Mac, contact its administrator. |
-| Waiting for Codex and its helpers | Use Command-Q, not just the window's close button. Keep Terminal open. Control-C cancels while waiting. |
-| Interrupted installation or recovery record | Keep the checkout and `.local/` intact. Follow the restore instructions; do not delete staging to force a new build. |
-| Startup, account, or integration regression | Restore the previous app and report the app version, Glow version, and a minimal reproduction. |
+| App version has not been reviewed | Use the [compatibility inspector and repair prompt](compatibility.md); do not bypass source checks. |
+| Inspector rejects a modified source | Use the preserved OpenAI-signed original matching the installed version. |
+| Installed app differs from the recorded snapshot | Use Refresh to prepare against the current reviewed source; do not reuse old staging or edit the snapshot. |
+| Local identity is missing, damaged, or mismatched | Preserve the checkout and private identity folder. Recover the original identity if available; do not delete files to force a silent replacement. |
+| Another identity session is active | Let that build finish before retrying. Do not remove its lock while it is running. |
+| Node or build tools are missing | Install Node.js 22.12+ and Apple's command-line tools (`xcode-select --install`), then reopen Terminal. |
+| Atomic exchange requires the same filesystem | Use a checkout on the app's filesystem, normally the internal disk. |
+| Waiting for Codex and helpers | Use Command-Q, not just the window close button. Keep Terminal open; Control-C cancels while waiting. |
+| Interrupted installation | Keep `.local/` intact and follow the restore instructions. |
+| Launch, account, or integration failure | Restore the previous bundle and report a minimal reproduction. Do not disable system protections. |
 
-Reports and logs in `.local/` can contain your username, file paths, and signing identifiers. Share only redacted excerpts. Never upload application bundles, account data, certificates, or private keys.
+Share only redacted diagnostics. Never upload app bundles, account data, private signing material, or unredacted local reports.

@@ -33,6 +33,7 @@ FILES = {'archive': 'Contents/Resources/app.asar', 'plist': 'Contents/Info.plist
 VERIFICATIONS = ('originalUnchanged', 'packedDataPreserved', 'electronFusesPreserved',
                  'codeSignatureVerified', 'signingTeamVerified', 'cspPreserved',
                  'installedBaselineUnchanged')
+COMMON_VERIFICATIONS = tuple(name for name in VERIFICATIONS if name != 'signingTeamVerified')
 
 
 def run(*args):
@@ -151,6 +152,175 @@ def require_certificate(value, label):
     return team
 
 
+def report_verified(report):
+    """The local policy is a separate schema, never a fallback for a failed cert."""
+    if report.get('schemaVersion') == 2:
+        return (report.get('signingMode') in (None, 'certificate')
+                and all(report.get(name) is True for name in VERIFICATIONS))
+    if report.get('schemaVersion') == 3:
+        return (report.get('signingMode') == 'local' and report.get('signingIdentity') is None
+                and report.get('signingPolicyVerified') is True
+                and report.get('signingTeamVerified') is False
+                and report.get('libraryValidationException') is True
+                and all(report.get(name) is True for name in COMMON_VERIFICATIONS))
+    if report.get('schemaVersion') == 4:
+        identity = report.get('signingIdentity') or {}
+        return (report_is_stable_local(report)
+                and identity.get('kind') == 'local'
+                and identity.get('strategy') == 'persistent-self-signed'
+                and re.fullmatch(r'[0-9A-F]{40}', str(identity.get('sha1', ''))) is not None
+                and re.fullmatch(r'[0-9a-fA-F]{64}', str(identity.get('certificateSha256', ''))) is not None
+                and isinstance(identity.get('name'), str) and bool(identity['name'])
+                and identity.get('teamIdentifier') is None
+                and isinstance(identity.get('keychainPath'), str) and Path(identity['keychainPath']).is_absolute()
+                and isinstance(identity.get('certificateValidTo'), str) and bool(identity['certificateValidTo'])
+                and report.get('stableIdentityVerified') is True
+                and report.get('signingPolicyVerified') is True
+                and report.get('signingTeamVerified') is False
+                and report.get('libraryValidationException') is True
+                and all(report.get(name) is True for name in COMMON_VERIFICATIONS))
+    return False
+
+
+def report_is_local(report):
+    return report.get('schemaVersion') in (3, 4) and report.get('signingMode') == 'local'
+
+
+def report_is_stable_local(report):
+    return (report.get('schemaVersion') == 4 and report.get('signingMode') == 'local'
+            and report.get('localSigningStrategy') == 'persistent-self-signed')
+
+
+def require_local_signature(value, label):
+    for name in ('signature', 'frameworkSignature'):
+        metadata = value.get(name, {})
+        if (metadata.get('adHoc') is not True
+                or metadata.get('teamIdentifier') not in (None, '', 'not set')
+                or not metadata.get('flags', 0) & 0x10000):
+            raise RuntimeError(f'{label} must retain hardened runtime and its verified local ad-hoc signature.')
+    return 'local'
+
+
+def verify_stable_requirement(path, identifier, sha1, label):
+    """Verify both the signer and the embedded identity used by Keychain tracking.
+
+    Keep this outside snapshot(): old recovery records must retain their exact
+    snapshot shape. An identifier-only embedded requirement would be unsafe even
+    when this particular build passes a stronger external requirement.
+    """
+    requirement = f'identifier {json.dumps(identifier)} and certificate leaf = H"{sha1}"'
+    run('/usr/bin/codesign', '--verify', '--strict', '-R', '=' + requirement, str(path))
+    display = run('/usr/bin/codesign', '--display', '-r-', str(path))
+    detail = display.stdout + '\n' + display.stderr
+    designated = re.findall(r'^designated => (.+)$', detail, re.MULTILINE)
+    expected = re.compile(r'identifier (?:("[A-Za-z0-9_.-]+")|([A-Za-z0-9_.-]+))'
+                          + r' and certificate (?:leaf|0) = H"([0-9a-fA-F]{40})"')
+    match = expected.fullmatch(designated[0].strip()) if len(designated) == 1 else None
+    actual_identifier = (json.loads(match.group(1)) if match.group(1) else match.group(2)) if match else None
+    if not match or actual_identifier != identifier or match.group(3).upper() != sha1:
+        raise RuntimeError(f'{label} does not retain its exact certificate-pinned designated requirement.')
+
+
+def require_stable_local_signature(value, report, label):
+    sha1 = report['signingIdentity']['sha1']
+    app = Path(value['app'])
+    for name, path, identifier in (
+            ('signature', app, 'com.openai.codex'),
+            ('frameworkSignature', app / FILES['framework'], 'com.openai.codex.framework')):
+        metadata = value.get(name, {})
+        if (metadata.get('adHoc') is not False
+                or metadata.get('teamIdentifier') not in (None, '', 'not set')
+                or metadata.get('identifier') != identifier
+                or not metadata.get('flags', 0) & 0x10000):
+            raise RuntimeError(f'{label} must retain hardened runtime and its stable local certificate signature.')
+        verify_stable_requirement(path, identifier, sha1, label)
+    return 'local'
+
+
+def require_report_signature(value, report, label, allow_local_signing=False):
+    if not report_verified(report):
+        raise RuntimeError('The staged build has not passed all required checks.')
+    if report_is_local(report):
+        if not allow_local_signing:
+            raise RuntimeError('Local signing requires explicit --allow-local-signing (or Refresh --local-signing).')
+        return (require_stable_local_signature(value, report, label) if report_is_stable_local(report)
+                else require_local_signature(value, label))
+    team = require_certificate(value, label)
+    if team != (report.get('signingIdentity') or {}).get('teamIdentifier'):
+        raise RuntimeError(f'{label} signature differs from the selected signing certificate.')
+    return team
+
+
+def local_recovery_records():
+    """Walk this checkout's journaled ancestry without following redirected paths."""
+    if not LATEST.exists():
+        if LATEST.is_symlink():
+            raise RuntimeError('Refusing a redirected recovery pointer.')
+        return
+    if LATEST.is_symlink() or LATEST.resolve() != LATEST:
+        raise RuntimeError('Refusing a redirected recovery pointer.')
+    build_id = json.loads(LATEST.read_text()).get('buildId')
+    if not valid_build_id(build_id):
+        raise RuntimeError('Invalid local signing recovery pointer; preserve it for review.')
+    visited = set()
+    while build_id:
+        if not valid_build_id(build_id) or build_id in visited or len(visited) >= 256:
+            raise RuntimeError('Invalid local signing recovery chain.')
+        visited.add(build_id)
+        record_file = RECOVERY / build_id / 'record.json'
+        if record_file.is_symlink() or record_file.resolve() != record_file:
+            raise RuntimeError('Refusing a redirected recovery record.')
+        record = json.loads(record_file.read_text())
+        if record.get('buildId') != build_id or record.get('target') != str(APP):
+            raise RuntimeError('Local signing recovery record targets a different app.')
+        yield record
+        build_id = record.get('previousBuildId')
+        if 'previousBuildId' in record and not valid_build_id(build_id):
+            raise RuntimeError('Invalid local signing recovery chain.')
+
+
+def local_recovery_report(value):
+    """Only exact journaled Glow builds may establish a local app baseline."""
+    for record in local_recovery_records():
+        report = record.get('buildReport', {})
+        if (record.get('state') in ('prepared', 'exchanged', 'installed', 'installed_backup_at_staging',
+                                   'restore_exchanged', 'restored')
+                and report_verified(report) and report_is_local(report)
+                and report.get('buildId') == record['buildId']
+                and comparable(record.get('replacement', {})) == comparable(value)
+                and comparable(report.get('stagedSnapshot', {})) == comparable(value)):
+            return report
+    return None
+
+
+def local_identity_pin():
+    """Retain the signer across vendor updates; never silently rotate a lost key."""
+    sha1 = None
+    for record in local_recovery_records():
+        report = record.get('buildReport', {})
+        if report.get('schemaVersion') != 4:
+            continue
+        if (not report_verified(report) or report.get('buildId') != record['buildId']
+                or comparable(record.get('replacement', {})) != comparable(report.get('stagedSnapshot', {}))):
+            raise RuntimeError('Stable local identity recovery evidence is invalid; preserve it for review.')
+        current = report['signingIdentity']['sha1']
+        if sha1 is not None and sha1 != current:
+            raise RuntimeError('Conflicting stable local identity pins in recovery history; refusing key rotation.')
+        sha1 = current
+    return sha1
+
+
+def require_installed_signature(value, label='Installed app'):
+    metadata = [value.get(name, {}) for name in ('signature', 'frameworkSignature')]
+    if any(item.get('adHoc') or item.get('teamIdentifier') in (None, '', 'not set') for item in metadata):
+        report = local_recovery_report(value)
+        if report is None:
+            raise RuntimeError(f'{label} has no matching verified local Glow recovery record; refusing an unrecognized local app.')
+        require_report_signature(value, report, label, allow_local_signing=True)
+        return 'local'
+    return require_certificate(value, label)
+
+
 def atomic_json(file, value):
     file.parent.mkdir(parents=True, exist_ok=True)
     temporary = file.with_name(file.name + f'.{os.getpid()}.tmp')
@@ -244,11 +414,17 @@ def restore_latest_pointer(record):
         LATEST.unlink()
 
 
-def preflight(mode):
+def preflight(mode, allow_local_signing=False):
     if mode == 'install':
         report = json.loads(REPORT.read_text())
-        if report.get('schemaVersion') != 2 or not all(report.get(key) is True for key in VERIFICATIONS):
+        if not report_verified(report):
             raise RuntimeError('The staged build has not passed all required checks.')
+        if report.get('schemaVersion') == 3:
+            raise RuntimeError('Legacy ad-hoc staging needs a fresh stable-identity build. Run Refresh Neon Codex.command --local-signing.')
+        if report_is_stable_local(report):
+            retained_pin = local_identity_pin()
+            if retained_pin is not None and report['signingIdentity']['sha1'] != retained_pin:
+                raise RuntimeError('The replacement local certificate differs from recovery history; refusing key rotation.')
         if report.get('installedBaseline', {}).get('app') != str(APP):
             raise RuntimeError('Build baseline does not target this installed app.')
         build_id = report.get('buildId', '')
@@ -259,10 +435,8 @@ def preflight(mode):
         current, incoming = snapshot(APP), snapshot(replacement)
         require_snapshot(current, report['installedBaseline'], 'Installed app')
         require_snapshot(incoming, report['stagedSnapshot'], 'Staged app')
-        require_certificate(current, 'Installed app')
-        team = require_certificate(incoming, 'Staged app')
-        if team != report.get('signingIdentity', {}).get('teamIdentifier'):
-            raise RuntimeError('Staged signature differs from the selected signing certificate.')
+        require_installed_signature(current, 'Installed app')
+        team = require_report_signature(incoming, report, 'Staged app', allow_local_signing)
         with (replacement / FILES['plist']).open('rb') as handle:
             info = plistlib.load(handle)
         if info.get('ElectronAsarIntegrity', {}).get('Resources/app.asar', {}).get('hash') != report['newHeaderHash']:
@@ -313,7 +487,9 @@ def preflight(mode):
         safe_paths(replacement)
         incoming = snapshot(replacement)
         require_snapshot(incoming, record['baseline'], 'Previous app backup')
-        team = require_certificate(incoming, 'Previous app backup')
+        # A recorded previous local build was explicitly authorized when it was
+        # installed. Recovery must remain available without a new mode choice.
+        team = require_installed_signature(incoming, 'Previous app backup')
         if (record_file.parent / 'Replaced Neon Codex.app').exists():
             raise RuntimeError('Displaced-build archive path already exists; preserve it for manual review.')
     for value in ((current, incoming) if mode == 'install' else (incoming,)):
@@ -324,12 +500,12 @@ def preflight(mode):
             'resumePrepared': mode == 'install' and resume is not None}
 
 
-def wait_and_swap(mode, timeout):
+def wait_and_swap(mode, timeout, allow_local_signing=False):
     LOCAL.mkdir(parents=True, exist_ok=True)
     with LOCK.open('a') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         write_status('preparing', operation=mode)
-        plan = preflight(mode)
+        plan = preflight(mode, allow_local_signing=allow_local_signing)
         if plan.get('noExchange'):
             plan['record']['state'] = 'no_exchange'
             atomic_json(plan['recordFile'], plan['record'])
@@ -338,6 +514,8 @@ def wait_and_swap(mode, timeout):
             return
         replacement = plan['replacement']
         deadline = time.monotonic() + timeout
+        if mode == 'install' and plan['team'] == 'local':
+            print('Identity migration: macOS may ask to let ChatGPT access "Codex Storage Key" in your login Keychain. Review that system prompt yourself. Always Allow can remember this stable local identity across Glow refreshes while its signing key is retained; app or Keychain policy changes may still require permission. The installer does not read that item or change its permissions.', flush=True)
         write_status('waiting_for_quit', operation=mode, signingTeam=plan['team'], timeoutSeconds=timeout)
         last_progress = 0
         while True:
@@ -457,22 +635,33 @@ def main():
     group.add_argument('--wait', choices=['install', 'restore'], help='Run in the foreground; wait for manual quit')
     group.add_argument('--check', choices=['install', 'restore'], help='Read-only preflight')
     group.add_argument('--snapshot', type=Path, help='Read-only signed bundle snapshot for the builder')
+    group.add_argument('--verify-local-baseline', type=Path, help='Verify a local build against its recovery record, without mutation')
+    group.add_argument('--local-identity-pin', action='store_true', help='Read the persistent local certificate pin from verified recovery history')
     group.add_argument('--self-test', action='store_true')
     parser.add_argument('--timeout', type=int, default=1800)
+    parser.add_argument('--allow-local-signing', action='store_true', help='Explicitly accept a verified local-signing replacement')
     args = parser.parse_args()
     if args.timeout <= 0:
         parser.error('--timeout must be positive')
     try:
         if args.snapshot:
             print(json.dumps(snapshot(args.snapshot.resolve()), indent=2))
+        elif args.verify_local_baseline:
+            if args.verify_local_baseline.resolve() != APP.resolve():
+                raise RuntimeError('Local baseline verification must target the installed app.')
+            value = snapshot(APP)
+            require_installed_signature(value)
+            print(json.dumps(value, indent=2))
+        elif args.local_identity_pin:
+            print(json.dumps({'sha1': local_identity_pin()}))
         elif args.self_test:
             self_test()
         elif args.check:
-            plan = preflight(args.check)
+            plan = preflight(args.check, allow_local_signing=args.allow_local_signing)
             print(json.dumps({'preflight': 'no_exchange' if plan.get('noExchange') else 'passed', 'operation': args.check, 'signingTeam': plan.get('team'),
                               'runningAppProcesses': len(app_processes((APP, plan['replacement'])))}))
         else:
-            wait_and_swap(args.wait, args.timeout)
+            wait_and_swap(args.wait, args.timeout, allow_local_signing=args.allow_local_signing)
     except KeyboardInterrupt:
         if args.wait:
             write_status('cancelled', operation=args.wait, message='Check the recovery record if exchange had already started.')
