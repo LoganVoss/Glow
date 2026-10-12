@@ -14,6 +14,7 @@ import { createHash, X509Certificate, randomUUID } from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
 import assert from 'node:assert/strict';
 import { withLocalIdentity } from './local-identity.mjs';
+import { patchSidebarCycle } from './sidebar-cycle-patch.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.dirname(HERE);
@@ -258,13 +259,15 @@ function cspMeta(html) {
   return matches[0];
 }
 function patchAssets(asar, archive, originalCSS) {
-  const sourceFiles = ['src/glow.css', 'src/settings.css', 'src/neon-codex.js', 'src/preferences.js', 'src/glow-layer.js'];
+  const sourceFiles = ['src/glow.css', 'src/settings.css', 'src/neon-codex.js', 'src/preferences.js', 'src/glow-layer.js', 'src/theme-transition.js', 'src/theme-transition.css', 'src/sidebar-cycle.js', 'src/sidebar-cycle.css'];
   const assets = Object.fromEntries(sourceFiles.map(file => [file, fs.readFileSync(path.join(ROOT, file))]));
   for (const [file, content] of Object.entries(assets)) assert.ok(content.length > 100, `Missing or empty source asset: ${file}`);
   const originalHTML = asar.extractFile(archive, PIN.html);
   const originalAppearance = asar.extractFile(archive, PIN.appearance);
+  const originalInitial = asar.extractFile(archive, PIN.initialRenderer);
   assert.equal(sha(originalHTML), PIN.htmlHash, 'Renderer HTML differs from the reviewed original');
   assert.equal(sha(originalAppearance), PIN.appearanceHash, 'Appearance component differs from the reviewed original');
+  assert.equal(sha(originalInitial), PIN.initialRendererHash, 'Native initial renderer differs from the reviewed original');
   assert.equal(sha(asar.extractFile(archive, PIN.settingsBridge)), PIN.settingsBridgeHash, 'Native settings bridge differs from the reviewed original');
   assert.equal(sha(asar.extractFile(archive, PIN.generalSettings)), PIN.generalSettingsHash, 'Native appearance control differs from the reviewed original');
   const html = originalHTML.toString();
@@ -288,13 +291,18 @@ function patchAssets(asar, archive, originalCSS) {
   const appearanceBoot = `import{startNeonCodex as __neonBoot}from"./neon-codex.js";import{Fan as __neonUseScope,H0t as __neonScope,p3t as __neonSettings,wjt as __neonWrite}from"./${path.posix.basename(PIN.settingsBridge)}";function __neonAppearanceSlot(){const __scope=__neonUseScope(__neonScope),__setTheme=m.useCallback(__theme=>{if(__theme!=="light"&&__theme!=="dark")return Promise.reject(new Error("Unsupported appearance mode"));return __neonWrite(__scope,__neonSettings.theme,__theme,{optimistic:false})},[__scope]),__ref=m.useCallback(__slot=>{if(__slot)__neonBoot().mountAppearance(__slot,{setTheme:__setTheme})},[__setTheme]);return(0,h.jsx)("div",{"data-neon-settings-slot":"v1",ref:__ref})}`;
   const patchedAppearance = appearanceBoot + appearance.replace(needle, replacement);
   run(process.execPath, ['--input-type=module', '--check'], { input: patchedAppearance });
+  const patchedInitial = patchSidebarCycle(originalInitial.toString());
+  run(process.execPath, ['--input-type=module', '--check'], { input: patchedInitial });
   const replacements = new Map([
-    [PIN.css, Buffer.concat([originalCSS, Buffer.from(MARKER), assets['src/glow.css'], Buffer.from('\n'), assets['src/settings.css'], Buffer.from('\n/* NEON CODEX LOCAL THEME — END */\n')])],
+    [PIN.css, Buffer.concat([originalCSS, Buffer.from(MARKER), assets['src/glow.css'], Buffer.from('\n'), assets['src/settings.css'], Buffer.from('\n'), assets['src/theme-transition.css'], Buffer.from('\n'), assets['src/sidebar-cycle.css'], Buffer.from('\n/* NEON CODEX LOCAL THEME — END */\n')])],
     [PIN.html, Buffer.from(patchedHTML)],
     [PIN.appearance, Buffer.from(patchedAppearance)],
+    [PIN.initialRenderer, Buffer.from(patchedInitial)],
     ['webview/assets/neon-codex.js', assets['src/neon-codex.js']],
     ['webview/assets/preferences.js', assets['src/preferences.js']],
     ['webview/assets/glow-layer.js', assets['src/glow-layer.js']],
+    ['webview/assets/theme-transition.js', assets['src/theme-transition.js']],
+    ['webview/assets/sidebar-cycle.js', assets['src/sidebar-cycle.js']],
   ]);
   return { replacements, sourceAssets: Object.fromEntries(Object.entries(assets).map(([file, content]) => [file, { bytes: content.length, sha256: sha(content) }])), csp: cspMeta(html) };
 }

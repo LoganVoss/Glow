@@ -7,6 +7,8 @@ import {
   recordProfileEdit, initializeProfile, mergeRemotePreferences, profileVariables, formatValue,
 } from './preferences.js';
 import { createGlowLayer } from './glow-layer.js';
+import { createThemeTransition } from './theme-transition.js';
+import { createSidebarCycle, SIDEBAR_STRUCTURE } from './sidebar-cycle.js';
 export * from './preferences.js';
 
 const SLOT_SELECTOR = '[data-neon-settings-slot="v1"]';
@@ -16,13 +18,16 @@ const OWN_SELECTOR = '[data-neon-settings-root],[data-neon-codex-frame]';
 export function startNeonCodex(win = window) {
   if (win.__neonCodexRuntime) return win.__neonCodexRuntime;
   const doc = win.document;
+  // Arm theme colors before the rest of Glow reads the new native palette.
+  const themeTransition = createThemeTransition(win);
   let storage;
   try { storage = win.localStorage; } catch { storage = null; }
   let preferences = loadPreferences(storage), saveTimer = null, destroyed = false;
   let synchronizedPreferences = normalizePreferences(preferences);
   const colorMedia = win.matchMedia('(prefers-color-scheme: dark)');
   const motionMedia = win.matchMedia('(prefers-reduced-motion: reduce)');
-  let panel = null, activeSlot = null, layer = null, nextID = 0;
+  let panel = null, activeSlot = null, layer = null, sidebar = null, nextID = 0;
+  let lastWindowType = doc.documentElement.getAttribute('data-codex-window-type');
   let setNativeTheme = null;
   const preparedSlot = doc.createElement('div');
 
@@ -119,6 +124,8 @@ export function startNeonCodex(win = window) {
   }
   function updateRuntime() {
     if (destroyed) return;
+    const type = doc.documentElement.getAttribute('data-codex-window-type');
+    if (type !== lastWindowType) { lastWindowType = type; sidebar?.reconcile(); }
     const theme = effectiveTheme();
     if (theme !== lastActualTheme) {
       initializeForTheme(theme); lastActualTheme = theme; panel?.setEditing(theme);
@@ -449,6 +456,7 @@ export function startNeonCodex(win = window) {
   // this prepared node, so the first Appearance frame contains the controls.
   panel = makePanel(); preparedSlot.append(panel.root);
   layer = createGlowLayer(win, { makeOverlay, applyOverlay, getTheme: effectiveTheme });
+  sidebar = createSidebarCycle(win, { onGeometryChange: () => layer.reconcile() });
 
   function mountAppearance(slot, options = {}) {
     if (destroyed || !slot || slot.ownerDocument !== doc) return;
@@ -460,6 +468,7 @@ export function startNeonCodex(win = window) {
   }
   function reconcile() {
     if (destroyed || !doc.body) return;
+    sidebar.reconcile();
     layer.reconcile();
     if (activeSlot && (!activeSlot.isConnected || panel.root.parentElement !== activeSlot)) {
       if (!panel.root.isConnected) preparedSlot.append(panel.root);
@@ -477,10 +486,13 @@ export function startNeonCodex(win = window) {
     let examined = 0;
     for (const mutation of records) {
       if (mutation.target.nodeType === 1 && mutation.target.closest(OWN_SELECTOR)) continue;
-      if (mutation.type === 'attributes') { reconcile(); return; }
+      if (mutation.type === 'attributes') {
+        if (mutation.attributeName === 'hidden' && !mutation.target.matches('.sidebar-navigation')) continue;
+        reconcile(); return;
+      }
       for (const node of [...mutation.addedNodes, ...mutation.removedNodes]) {
         if (node.nodeType !== 1 || node.matches(OWN_SELECTOR)) continue;
-        if (++examined > 64 || node.matches(`${SLOT_SELECTOR},${ROW_SELECTOR}`) || node.querySelector(`${SLOT_SELECTOR},${ROW_SELECTOR}`)) {
+        if (++examined > 64 || node.matches(`${SLOT_SELECTOR},${ROW_SELECTOR},${SIDEBAR_STRUCTURE}`) || node.querySelector(`${SLOT_SELECTOR},${ROW_SELECTOR},${SIDEBAR_STRUCTURE}`)) {
           reconcile(); return;
         }
       }
@@ -497,17 +509,18 @@ export function startNeonCodex(win = window) {
   function ready() {
     if (destroyed) return;
     structureObserver.observe(doc.body, { childList: true, subtree: true, attributes: true,
-      attributeFilter: ['data-app-shell-frame', 'data-app-shell-page-surface', 'data-app-shell-workspace-row', 'data-neon-settings-slot'] });
+      attributeFilter: ['data-app-shell-frame', 'data-app-shell-page-surface', 'data-app-shell-workspace-row', 'data-neon-settings-slot', 'data-app-shell-sidebar-open', 'hidden'] });
     themeObserver.observe(doc.body, { attributes: true, attributeFilter: ['data-theme', 'class', 'style'] });
     reconcile();
   }
   const runtime = {
     version: SETTINGS_VERSION, mountAppearance,
+    cycleSidebar(options) { return sidebar.cycle(options); },
     getPreferences() { return normalizePreferences(preferences); },
     reset() { preferences = defaultPreferences(); changed(); },
     destroy() {
       if (destroyed) return; flush(); destroyed = true;
-      structureObserver.disconnect(); themeObserver.disconnect(); layer.destroy(); panel.destroy();
+      structureObserver.disconnect(); themeObserver.disconnect(); sidebar.destroy(); layer.destroy(); panel.destroy(); themeTransition.destroy();
       colorMedia.removeEventListener('change', updateRuntime); motionMedia.removeEventListener('change', updateRuntime);
       win.removeEventListener('storage', storageChanged); win.removeEventListener('pagehide', flush); doc.removeEventListener('DOMContentLoaded', ready);
       activeSlot = null; delete win.__neonCodexRuntime;

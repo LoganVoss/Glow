@@ -1,0 +1,95 @@
+/* A third layout on the native control. Do not change the rail's measured width. */
+[data-neon-sidebar-ready="true"]:is([data-neon-sidebar-hidden="true"], [data-neon-sidebar-moving="true"]) {
+  --app-shell-navigation-rail-width: var(--neon-rail-space) !important;
+  --neon-sidebar-motion: 420ms cubic-bezier(.22,.75,.2,1);
+}
+[data-neon-sidebar-ready="true"]:is([data-neon-sidebar-hidden="true"], [data-neon-sidebar-moving="true"]) [data-neon-rail="v1"] {
+  margin-inline-end: calc(var(--neon-rail-space) - var(--neon-rail-expanded-space));
+  z-index: 45;
+  pointer-events: none;
+}
+[data-neon-rail-icons="v1"] {
+  opacity: 1;
+  pointer-events: auto;
+}
+[data-neon-sidebar-moving="true"] [data-neon-rail-icons="v1"] {
+  transition: opacity 160ms ease, translate 420ms cubic-bezier(.22,.75,.2,1), visibility 160ms;
+}
+[data-neon-sidebar-icons-hidden="true"] [data-neon-rail="v1"] > :not([data-neon-rail-profile="v1"]) {
+  opacity: 0;
+  visibility: hidden;
+  translate: -8px 0;
+  pointer-events: none;
+}
+[data-neon-rail-profile="v1"] { pointer-events: auto; }
+/* A full-width window symbol identifies the third state. Native icons, button
+   layout, hover treatment and command handlers remain in place underneath it. */
+[data-app-shell-sidebar-trigger][aria-controls="app-shell-sidebar"][data-neon-sidebar-layout="expanded"] {
+  position: relative;
+}
+[data-app-shell-sidebar-trigger][data-neon-sidebar-layout="expanded"] svg { visibility: hidden; }
+[data-app-shell-sidebar-trigger][data-neon-sidebar-layout="expanded"]::after {
+  content: "";
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  inset: 0;
+  margin: auto;
+  background: currentColor;
+  pointer-events: none;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.25' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='2.5' y='3.5' width='15' height='13' rx='2.5'/%3E%3Cpath d='m7.5 7.5-2.5 2.5 2.5 2.5M5.5 10h9m-2-2.5 2.5 2.5-2.5 2.5'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+/* The original account and update controls occupy their original corner. */
+[data-neon-sidebar-hidden="true"] #app-shell-sidebar .sidebar-navigation:not(.sidebar-navigation .sidebar-navigation) {
+  padding-block-end: var(--neon-account-space, 52px);
+}
+[data-neon-sidebar-ready="true"]:is([data-neon-sidebar-hidden="true"], [data-neon-sidebar-moving="true"]) [data-neon-rail-panel="v1"]:has(#app-shell-sidebar) {
+  margin-inline-end: calc(var(--neon-rail-space) - var(--neon-rail-expanded-space));
+}
+[data-neon-sidebar-ready="true"]:is([data-neon-sidebar-hidden="true"], [data-neon-sidebar-moving="true"]) [data-neon-rail-panel="v1"]:has(#app-shell-sidebar) > [data-neon-rail-panel-clip="v1"] {
+  width: calc(100% + var(--neon-rail-space) - var(--neon-rail-expanded-space)) !important;
+}
+[data-neon-sidebar-ready="true"]:is([data-neon-sidebar-hidden="true"], [data-neon-sidebar-moving="true"]) [data-neon-rail-panel="v1"]:has(#app-shell-sidebar) [data-neon-rail-panel-content="v1"] {
+  width: calc(var(--neon-panel-width) + var(--neon-rail-space) - var(--neon-rail-expanded-space)) !important;
+  min-width: calc(var(--neon-panel-width) + var(--neon-rail-space) - var(--neon-rail-expanded-space)) !important;
+}
+[data-neon-sidebar-ready="true"]:is([data-neon-sidebar-hidden="true"], [data-neon-sidebar-moving="true"]) [data-neon-rail-panel="v1"] > [class~="group/panel-resizer"] {
+  inset-inline-end: calc(var(--neon-rail-expanded-space) - var(--neon-rail-space));
+}
+/* Geometry gets transitions only during a cycle, never during normal resizing.
+   Theme colors compose with these rules rather than freezing a prior geometry. */
+:where(:root[data-neon-theme-transition="v1"]) [data-neon-sidebar-geometry="v1"] {
+  transition: var(--neon-theme-base-transition, all 0s), var(--neon-theme-color-transition);
+}
+[data-neon-sidebar-moving="true"] :is([data-neon-rail="v1"], [data-neon-rail-panel="v1"]) {
+  transition: margin-inline-end var(--neon-sidebar-motion), var(--neon-theme-color-transition, background-color 0s);
+}
+[data-neon-sidebar-moving="true"] > [data-app-shell-workspace-row] > ._PageSurface_yl8z4_2 {
+  transition: inset-inline-start var(--neon-sidebar-motion), var(--neon-theme-color-transition, background-color 0s);
+}
+[data-neon-sidebar-moving="true"] [data-neon-rail-panel-clip="v1"] {
+  transition: width var(--neon-sidebar-motion), var(--neon-theme-color-transition, background-color 0s);
+}
+[data-neon-sidebar-moving="true"] [data-neon-rail-panel-content="v1"] {
+  transition: width var(--neon-sidebar-motion), min-width var(--neon-sidebar-motion), var(--neon-theme-color-transition, background-color 0s);
+}
+[data-neon-sidebar-moving="true"] [data-neon-rail-panel="v1"] > [class~="group/panel-resizer"] {
+  transition: inset-inline-end var(--neon-sidebar-motion), var(--neon-theme-color-transition, background-color 0s);
+}
+.neon-settings-home {
+  appearance: none; display: grid; place-items: center; flex-shrink: 0;
+  width: 28px; height: 28px; margin-inline-start: 6px; padding: 0;
+  border: 0; border-radius: 7px; background: transparent;
+  color: var(--color-text-secondary, var(--text-secondary, #818186));
+  cursor: pointer; -webkit-app-region: no-drag;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+.neon-settings-home[hidden] { display: none; }
+.neon-settings-home svg { width: 17px; height: 17px; }
+.neon-settings-home:hover { background: color-mix(in srgb, currentColor 9%, transparent); color: var(--color-text-primary, var(--text-primary, #252529)); }
+.neon-settings-home:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+[data-neon-sidebar-hidden="true"] [data-neon-settings-title] { flex: 0 1 auto; }
+:root[data-reduced-motion="true"] [data-neon-sidebar-ready="true"] :is([data-neon-sidebar-geometry], [data-neon-rail-icons]) { transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-reduced-motion="false"]) [data-neon-sidebar-ready="true"] :is([data-neon-sidebar-geometry], [data-neon-rail-icons]) { transition: none; }
+}

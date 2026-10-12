@@ -21,7 +21,8 @@ import install as installer
 ROOT = Path(__file__).resolve().parent.parent
 PINS = ROOT / 'scripts/source-pins.json'
 ASSETS = ('src/glow.css', 'src/settings.css', 'src/neon-codex.js',
-          'src/preferences.js', 'src/glow-layer.js')
+          'src/preferences.js', 'src/glow-layer.js', 'src/theme-transition.js',
+          'src/theme-transition.css', 'src/sidebar-cycle.js', 'src/sidebar-cycle.css')
 MAX_ATTEMPTS = 3
 
 

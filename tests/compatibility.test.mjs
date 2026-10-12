@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createHash } from 'node:crypto';
 import { inspectStructure, APPEARANCE_NEEDLE } from '../scripts/compatibility.mjs';
+import { SIDEBAR_CALLBACK, SIDEBAR_REGISTRATION } from '../scripts/sidebar-cycle-patch.mjs';
 
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
 function fixture() {
@@ -12,6 +13,8 @@ function fixture() {
     'webview/assets/appearance-settings-a1.js': `import{Agn as t,PCn as r}from"./app-shared-a1.js";import{n as u}from"./general-settings-a1.js";var m,h;m=r();h=t();function f(){const i=true;return ${APPEARANCE_NEEDLE}}`,
     'webview/assets/app-shared-a1.js': 'export{a as Fan,b as H0t,c as p3t,d as wjt,e as Agn,f as PCn};',
     'webview/assets/general-settings-a1.js': 'import{Fan as N,H0t as P,p3t as Xt,wjt as V}from"./app-shared-a1.js";function theme(){let t=N(P);return e=>V(t,Xt.theme,e,{optimistic:!1})}',
+    'webview/assets/entry-a1.js': 'import "./app-initial-a1.js";',
+    'webview/assets/app-initial-a1.js': `function Qni(e,t,n){let r=[],i=n===void 0||n,a;${SIDEBAR_CALLBACK};${SIDEBAR_REGISTRATION}}`,
   }));
   const integrity = { 'Resources/app.asar': { algorithm: 'SHA256', hash: 'ab'.repeat(32) } };
   const info = { CFBundleIdentifier: 'com.openai.codex', CFBundleShortVersionString: '99.1', CFBundleVersion: '999', ElectronAsarIntegrity: integrity };
@@ -34,7 +37,7 @@ test('unknown build with intact structural anchors yields a proposal, not suppor
   const f = fixture(), before = JSON.stringify([...f.assets]);
   const result = inspect(f);
   assert.equal(result.status, 'compatible-candidate', result.reason);
-  assert.deepEqual(Object.keys(result.assets), ['html','css','appearance','settingsBridge','generalSettings']);
+  assert.deepEqual(Object.keys(result.assets), ['html','css','appearance','settingsBridge','generalSettings','initialRenderer']);
   assert.equal(result.candidateSourcePin.key, '99.1:999');
   assert.equal(result.candidateSourcePin.value.appearanceHash, sha(f.assets.get('webview/assets/appearance-settings-a1.js')));
   assert.equal(JSON.stringify([...f.assets]), before);
@@ -52,6 +55,21 @@ test('known build must match every recorded source field', () => {
 test('unknown asset hashes can change only with all structural checks intact', () => {
   const f = fixture(); change(f, 'app-shared-a1.css', 'black', 'white');
   assert.equal(inspect(f).status, 'compatible-candidate');
+});
+test('native sidebar command structural changes and unlinked renderer are refused', () => {
+  let f = fixture(); change(f, 'app-initial-', 'Pw(`toggleSidebar`,o)', 'Pw(`other`,o)');
+  reject(f, /native titlebar\/menu sidebar command registration/);
+  f = fixture(); change(f, 'app-initial-', 'animate:t', 'animate:!1');
+  reject(f, /reviewed native sidebar command callback/);
+  f = fixture(); change(f, 'entry-a1', 'app-initial-a1.js', 'other-a1.js');
+  reject(f, /linked native initial renderer/);
+});
+test('known build rejects changes to native initial renderer even when hook still matches', () => {
+  const f=fixture(), proposal=inspect(f).candidateSourcePin;
+  change(f,'app-initial-','let r=[]','let r=[null]');
+  const result=inspect(f,{[proposal.key]:proposal.value});
+  assert.equal(result.status,'unsupported');
+  assert.match(result.reason,/Reviewed source pin mismatch: initialRendererHash/);
 });
 test('duplicate Appearance candidates are refused', () => {
   const f = fixture();f.assets.set('webview/assets/appearance-settings-a2.js', f.assets.get('webview/assets/appearance-settings-a1.js'));

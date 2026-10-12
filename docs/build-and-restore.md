@@ -23,7 +23,7 @@ The certificate mode preserves hardened runtime, library validation, and Electro
 
 ### Persistent local signing
 
-Glow 0.9.0 provides explicit `--local-signing`. It creates a private self-signed code-signing identity automatically and reuses it across builds. No Apple certificate, paid membership, or publisher signature is required. The identity stays in `~/Library/Application Support/Glow/Signing`, outside the checkout; retain it and never upload its files. A new app version can be rebuilt locally once its integration has been reviewed.
+Glow 0.10.5 provides explicit `--local-signing`. It creates a private self-signed code-signing identity automatically and reuses it across builds. No Apple certificate, paid membership, or publisher signature is required. The identity stays in `~/Library/Application Support/Glow/Signing`, outside the checkout; retain it and never upload its files. A new app version can be rebuilt locally once its integration has been reviewed.
 
 ```sh
 "./Refresh Neon Codex.command" --local-signing --prepare-only

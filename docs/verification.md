@@ -1,5 +1,105 @@
 # Verification
 
+## 0.10.5 — Sidebar state and motion polish, October 12, 2026
+
+The hidden-rail layout now has a distinct full-width window icon on the original titlebar control and an accessible state description. Its native button, handlers, original icons for the other two states, and hover treatment remain intact. The icon is a local CSS mask permitted by the existing CSP; no policy changes or network requests are needed.
+
+The Settings → Home flash was reproduced with an undecorated replacement destination group: the old controller briefly restored visibility and faded it out again. Replacement groups now inherit the requested hidden state before measurement, without restoring the shell or replaying a toggle. Icon visibility also remains stable through temporary narrow native panel widths; native geometry and the account control remain safe. The regression checks the immediate style and every sampled rendered frame, original profile identity, hit testing, and unchanged frame bounds.
+
+Theme surfaces and borders dissolve over **160 ms**, with immediate foreground colors and native mode selection. This avoids inherited text colors trailing behind nested surfaces. A focused test verifies immediate text response, interpolated surfaces, and settlement within 200 ms. Reduced motion, reversals, streaming behavior, and simultaneous sidebar motion remain covered.
+
+Passed source/browser checks: **37** preference/runtime tests, **17** compatibility tests, **6** command-transform tests, **26** refresh tests, **23** existing Glow browser cases, **10** theme cases, **4** early-window startup cases, and **19** sidebar cases. The final icon and hidden Settings layout were visually reviewed in isolated fixtures. The README sidebar note is placed directly below the Settings image, and installation/release documentation is updated for 0.10.5.
+
+Preparation returned **READY** for **26.1007.30912 (20156)**, reused the persistent local identity, verified all **110 code objects**, and passed installation preflight. All nine source hashes and five packaged JavaScript modules match the final source. Exactly nine packed renderer entries changed as allowed; unpacked native signing/integrity updates are accounted for separately. CSP, Electron fuses, the original packed payload, the vendor original, and the installed baseline passed preservation checks.
+
+The staged native modules passed all **three** isolated bootstrap cases (normal, deliberately failing, and missing Glow), and the real Settings lazy import resolves. The initial renderer matches exactly the reviewed optional command patch; the Settings chunk remains byte-identical to the preserved original. These checks do not replace a native post-install test. The hosted session did not quit or replace the running app. Release packaging includes committed source/documentation/images only, with no app bundle, account data, private reports, or signing material.
+
+## 0.10.4 superseded local candidate — Native sidebar cycle, October 12, 2026
+
+The user requested restoring the expanded layout through the existing titlebar **Toggle Sidebar** command. Its first click keeps native chat-list hiding; the second restores chats while tucking away the icon rail; the third restores both. The same command serves the keyboard/menu. There is no second toggle or added selected-button styling. State stays local to the current window and persists across its route changes.
+
+The account/footer subtree stays intact. Settings keeps the rail hidden and gains a small Home button beside its existing title. Home invokes the original native Home destination, retaining its guarded navigation path. The Settings module itself is unchanged. Rail-only destinations temporarily retain native navigation to protect account access. Normal native peek/hover widths are not overridden.
+
+The only initial-renderer modification is an exact, hash-pinned optional command callback with the original native fallback. Neither Glow nor its sidebar module enters the native startup dependency graph. The actual OpenAI-signed **20052** and **20156** sources were inspected, their shared command and footer/panel/Settings structures reviewed, and both return `compatible-known`. The persistent local signing policy is unchanged.
+
+Verification passed: 37 preference/runtime tests, 17 compatibility tests, 6 native-command transform/behavior tests, 26 refresh tests, 23 existing Glow browser cases, 9 theme cases, 4 early-window startup cases, and 16 dedicated sidebar cases. The dedicated tests include native peek, rail-only account hit testing, original profile identity, Settings Home, disabled Home, optional failure fallback, rapid reversals, per-frame border geometry, reduced motion, replacement Home handlers, simultaneous theme and layout motion, cleanup, and complete shell replacement without an expanded frame or replayed collapse. Light-mode fixture screenshots were visually reviewed. These are isolated browser/source checks, not proof of native account or application startup.
+
+Preparation returned **READY** for **26.1007.30912 (20156)**, reused the persistent local identity, verified all **110 code objects**, and passed installation preflight. All nine source hashes and all five packaged JavaScript modules match the final source. The nine changed packed renderer entries match the explicit allowlist; unpacked native code has the expected signing/integrity updates. CSP, Electron fuses, the original packed payload, the vendor original, and the installed baseline passed preservation checks.
+
+The staged native bootstrap passes all three cases: normal Glow, intentionally throwing Glow, and missing Glow. The initial renderer equals exactly the reviewed optional command transformation of the preserved original; the Settings module is byte-identical and its real lazy import resolves. The normal app still requires post-install native testing. This hosted session did not quit, launch, or replace the installed app, access account data, or publish the candidate.
+
+## 0.10.3 superseded local candidate — Restore native navigation, October 12, 2026
+
+Removed the complete custom sidebar experiment at the user's request: collapse/expand controller, CSS and animation rules, stored-choice handling, Settings Home/loading hooks, native renderer and Settings navigation transformations, related build pins, fixture controls, and feature-specific tests. Native navigation and account positioning are left to the app. Glow's border and Appearance controls remain, along with the independent light/dark color dissolve.
+
+The builder returns to changing only the shared appearance stylesheet, renderer HTML, and native Appearance component, plus four self-contained Glow JavaScript modules. No custom sidebar module is packaged. The early-window startup and native bootstrap regressions remain; the latter can compare the initial renderer and Settings navigation chunk byte-for-byte with `NEON_TEST_ORIGINAL_ASAR`.
+
+Verification passed: 37 preference/runtime tests, 23 Glow browser cases, 9 independent theme cases, 4 early-window startup cases, 15 compatibility tests, and 26 refresh tests. The staged archive also passes all three isolated native bootstrap cases (normal, throwing, and missing Glow), imports the native Settings page successfully, and matches the preserved original's initial renderer and Settings navigation chunk **byte for byte**.
+
+Preparation built 0.10.3 for **26.1007.30912 (20156)**, reused the persistent local identity, verified all **110 code objects**, passed installation preflight, and returned READY. The seven source hashes and four packaged JavaScript files match the final source. The seven changed archive entries match the explicit Glow-only allowlist; no sidebar runtime or hooks are packaged. Original data, CSP, Electron fuses, and installed baseline checks passed. The installed app was not replaced, launched, or quit; no Keychain permissions were changed. Native reopening after installation remains a manual check.
+
+The 0.10.0–0.10.2 notes below are historical verification records for the removed experiment, not current features or installation recommendations.
+
+## 0.10.2 superseded candidate — Settings continuity and motion, October 12, 2026
+
+The collapsed rail now stays hidden through Settings and its lazy loading placeholder. A small Home control beside the native Settings title navigates to the app's chats Home through its existing unsaved-change guard. It is absent from expanded navigation. The original profile subtree, handlers, native legacy Back, and Settings close action remain unchanged. The newly edited Settings chunk is discovered through the actual initial renderer import, hash-pinned, and checked by the compatibility inspector for both reviewed builds.
+
+The sidebar button now uses its arrow direction alone for persistent state. Collapse animates the specific geometry anchors instead of propagating an animated inherited variable through the entire chat tree; native live resizing stays immediate once the short toggle transition ends. In an isolated 6,000-node fixture, style-recalculation time fell about 75% and total browser task time about 26% across six toggles. This is workload evidence, not a measured native-app frame-rate claim.
+
+Light/dark changes use a 320ms color dissolve on native surfaces and controls. Existing layout, transform, and opacity transitions are preserved. There is no snapshot layer or input blocking. Reduce Motion cancels the dissolve. Setup inspects only newly added element subtrees after initial setup: a probe of 30 streamed text replacements triggered zero document scans and zero animation-frame requests from the theme helper.
+
+Source/UI verification passed:
+
+- 18 sidebar browser cases, including Settings navigation through the original account menu, keyboard Home, no loading-state flash, unchanged account identity, no selected fill, rapid reversals, geometry continuity, immediate resizing, and disposal. Light/dark collapsed Settings screenshots were visually reviewed; they are standalone fixture captures.
+- 8 theme browser cases, including intermediate rendered colors, rapid reversal, native system-mode resolution, reduced-motion cancellation, cleanup, live input, incremental setup, and simultaneous rail/theme changes with an aligned border and fixed account corner.
+- All 23 existing Glow browser cases, 37 preference/runtime tests, 4 early-window startup cases, 9 sidebar transform tests, 6 Settings transform tests, 18 compatibility tests, and 26 refresh tests.
+- Read-only compatibility inspection of both pristine OpenAI-signed sources returns `compatible-known` with the new Settings integration checks.
+
+Final preparation built **0.10.2** for **26.1007.30912 (20156)**, reused the persistent local signing identity, verified all **110 code objects**, passed installation preflight, and returned READY. All nine source hashes, five packaged JavaScript files, and both transformed native chunks match the final tested sources. Ten archive entries changed; original packed data, CSP, Electron fuses, and installed baseline checks passed.
+
+The actual staged archive passes all three isolated bootstrap cases (normal Glow, deliberately throwing Glow, missing Glow). In the normal case the test also imports the real patched Settings chunk and verifies its `SettingsPage` export without page errors or missing dependencies. This executes the bundled modules in a fresh browser with external networking blocked; it does not launch the native app or access an account. Preparation did not replace or quit the installed app, change Keychain permissions, or publish a GitHub release.
+
+Actual native reopening, Settings prompts, and sustained motion quality still require the [native smoke test](smoke-test.md) after installing this candidate. The user’s feedback on 0.10.1 established that the app reopened and the rail was usable; it also identified the Settings navigation and motion issues addressed here. It was not a complete native feature pass.
+
+## 0.10.1 local repair — Startup isolation, October 12, 2026
+
+The user reported that installing 0.10.0 left the native app stuck loading. The failure was reproduced using that installed archive's actual renderer assets in a fresh isolated browser: before the native window type is set, the navigation controller stored `false` as its shell and called `shell?.querySelector(...)`. That throws because optional chaining only protects null/undefined. The new static import in the native entry propagated the exception and prevented both native entry modules from completing. The pristine original and earlier working recovery completed without errors.
+
+0.10.1 uses a null shell until the main window exists and removes Glow from the native entry module's static dependencies. Glow loads independently from HTML. The sidebar's optional mount bridge tolerates an absent runtime and catches mount errors, leaving the native toolbar able to commit. This isolation applies to native startup and the new sidebar bridge; the existing Appearance bridge is unchanged.
+
+The four startup regression cases now pass for unset, browser, utility, and electron window types, including late main-window initialization and switching back to a utility window. Before the fix, all four failed. All 8 native-transform tests, 17 compatibility tests, and 37 preference/runtime tests pass. The native-transform checks include absent-runtime and throwing-mount cases.
+
+To test the actual staged renderer modules without launching the app or touching account data:
+
+```sh
+npm run test:startup
+NEON_TEST_APP_ASAR="$PWD/.local/staging/ChatGPT.app/Contents/Resources/app.asar" node --test tests/native-bootstrap.test.mjs
+```
+
+The opt-in test serves only the archive's webview assets to an isolated browser and blocks external requests. It checks native module completion and optional-runtime failure isolation. It does not establish actual Electron startup, account access, integrations, or native sidebar behavior. Those require the [native smoke test](smoke-test.md) after installation.
+
+Final verification passed:
+
+- The actual staged 0.10.1 archive completes both native startup modules in all three cases: normal Glow, deliberately throwing Glow, and a missing Glow module. The normal case has no page errors; injected failures remain isolated from native module evaluation.
+- All 23 existing Glow browser scenarios and 13 sidebar scenarios pass, including the original profile/menu, input and dialogs, settings routing, persistence, native-shaped resizing, and cleanup.
+- `Refresh Neon Codex.command --local-signing --prepare-only` built for **26.1007.30912 (20156)**, verified all **110 signed code objects**, reused the persistent identity, passed installation preflight, and returned READY. All seven source hashes and all four packaged JavaScript files match the tested source. The packaged native entry exactly matches the final guarded transform.
+- Source/original bundle, packed data, CSP, Electron fuses, and installed baseline checks passed. The installed app was not replaced or launched by preparation. No real Keychain permissions were read or changed. This repair has not been published as a GitHub release; actual native reopening and account functionality still require confirmation.
+
+## 0.10.0 local candidate — Navigation rail, October 12, 2026
+
+The arrow control mounts immediately before the native notification bell. It collapses only the outer icon rail, retains the chat-list width, and gives the reclaimed width to the conversation. One animated measurement drives panel space and the page surface that Glow already follows. The original account/profile subtree, menu, native rail measurement, and panel resize handlers are preserved. The preference is local and independent of Glow's on/off state.
+
+Verification passed:
+
+- 13 isolated browser scenarios, including continuous pre-paint alignment through rapid reversals, exact reclaimed width, unchanged avatar identity, account-menu operation, footer clearance, keyboard focus, persistence, cross-window sync, reduced motion, native compact-panel fallback, header remounts, and disposal.
+- 6 native-transform tests and 17 compatibility tests. Both reviewed pristine vendor renderers (20052 and 20156) passed the full transform and syntax checks; the compatibility inspector verifies the initial renderer and geometry assets as well as Appearance.
+- All 37 existing preference/runtime tests, 23 existing Glow browser scenarios, and 26 refresh regression tests.
+- Visual review of the collapsed light and dark standalone fixtures. These screenshots are not captures of the native application.
+
+The final `Refresh Neon Codex.command --local-signing --prepare-only` built 0.10.0 for **26.1007.30912 (20156)**, reused the persistent signing identity, verified all **110 code objects**, passed installation preflight, and returned READY. All seven source assets match the staged report and the packaged navigation runtime matches the final tested source. Eight archive entries changed. CSP, original packed data, signature policy, and the installed baseline checks passed.
+
+**Native launch failed after the user installed this candidate.** The earlier preparation had not replaced, quit, or launched the app; its fixture and packaging checks missed the absent window type during native startup. See the 0.10.1 repair above. This candidate was not published as a GitHub release. The sidebar's actual account menu, navigation, compact/peek behavior, resizing, and browser/right-pane layout still require native checks.
+
 ## 0.9.0 — Persistent local identity, October 12, 2026
 
 The local signing mode now generates and retains a unique self-signed identity on the user's Mac. It requires no Apple-issued certificate, membership, or per-update publisher signature. Exact code requirements bind the certificate and each code identifier; local identity state is pinned and preserved across refreshes. No real Codex Keychain item or access list was inspected or changed during development.

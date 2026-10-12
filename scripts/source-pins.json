@@ -15,7 +15,9 @@
     "settingsBridge": "webview/assets/app-shared-2f2228189a8d.js",
     "settingsBridgeHash": "47b7173d0bbecc5f6f32157134add7be65c0a22c2555c5bbeb9665b1bcded7b0",
     "generalSettings": "webview/assets/general-settings-4f37c778160b.js",
-    "generalSettingsHash": "10cd35701d94918a65bcc4a2a1bd8673cc0d58a68eaab09ab37a2efbf877541d"
+    "generalSettingsHash": "10cd35701d94918a65bcc4a2a1bd8673cc0d58a68eaab09ab37a2efbf877541d",
+    "initialRenderer": "webview/assets/app-initial-c468e3fd7f91.js",
+    "initialRendererHash": "efd785d44bc6f07771f3d5a21cf255112d0f17969b398889e6a8a4868338152f"
   },
   "26.1007.30912:20156": {
     "bundle": "com.openai.codex",
@@ -33,6 +35,8 @@
     "settingsBridge": "webview/assets/app-shared-8bd9d0399038.js",
     "settingsBridgeHash": "607ad0866dd25ed3764711b4467a9b60708353a599485b5249ff4cbe0e870245",
     "generalSettings": "webview/assets/general-settings-65e65871cdcd.js",
-    "generalSettingsHash": "f33572c6e595282128f80cfcbfc255d3edd6ed63613665e96b15251664d89982"
+    "generalSettingsHash": "f33572c6e595282128f80cfcbfc255d3edd6ed63613665e96b15251664d89982",
+    "initialRenderer": "webview/assets/app-initial-6350d04672d0.js",
+    "initialRendererHash": "604b5d2de4fbb41f3d0dc5b3662129c558e1c7b8aac8cc87225286f58dcfaf8f"
   }
 }

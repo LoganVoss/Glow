@@ -1,0 +1,22 @@
+/* A quick surface dissolve, with immediate, readable foregrounds. Animating
+   inherited text color at every nested surface makes each child chase its
+   parent's changing value, leaving text trailing after the theme has switched.
+   Native layout motion stays intact and the app never waits for this effect. */
+:root[data-neon-theme-transition="v1"] {
+  --neon-theme-color-transition:
+    background-color 160ms cubic-bezier(.2,.65,.3,1),
+    color 0s,
+    border-color 160ms cubic-bezier(.2,.65,.3,1);
+}
+:root[data-neon-theme-transition="v1"][data-neon-theme-colors="v1"],
+:root[data-neon-theme-transition="v1"] [data-neon-theme-colors="v1"]:not([data-neon-sidebar-geometry]) {
+  transition: var(--neon-theme-base-transition, all 0s), var(--neon-theme-color-transition) !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root[data-neon-theme-transition="v1"]:not([data-reduced-motion="false"]) {
+    --neon-theme-color-transition: background-color 0s, color 0s, border-color 0s;
+  }
+}
+:root[data-neon-theme-transition="v1"][data-reduced-motion="true"] {
+  --neon-theme-color-transition: background-color 0s, color 0s, border-color 0s;
+}

@@ -7,29 +7,61 @@
   <link rel="stylesheet" href="../src/glow.css">
   <link rel="stylesheet" href="../src/settings.css">
   <link rel="stylesheet" href="preview.css">
+  <link rel="stylesheet" href="../src/theme-transition.css">
+  <link rel="stylesheet" href="../src/sidebar-cycle.css">
   <script type="module" src="../src/neon-codex.js"></script>
   <script type="module" src="preview.js"></script>
 </head>
 <body>
   <header class="preview-heading">
     <a href="./index.html" aria-label="Neon Codex preview"><span class="brand-dot" aria-hidden="true"></span>Neon Codex</a>
-    <span>Appearance study <span class="version">0.8.9</span></span>
+    <span>Appearance study <span class="version">0.10.5</span></span>
     <button id="view-toggle" type="button">Show workspace</button>
   </header>
   <div data-app-shell-frame data-app-shell-page-surface="true">
     <div data-app-shell-workspace-row>
-      <div class="page-surface"></div>
-      <div class="titlebar"><i></i><i></i><i></i><span class="window-title">Codex</span></div>
-      <nav class="rail" aria-label="Preview navigation"><span>⌂</span><span>▱</span><span>◷</span><span>◎</span><span>⋯</span><span class="rail-bottom">NC</span></nav>
-      <aside class="sidebar">
-        <strong>Codex <span>⌄</span></strong>
-        <div class="sidebar-action">＋ <span>New chat</span></div>
-        <div class="sidebar-label">Recents</div>
-        <div class="sidebar-item">A little more atmosphere</div>
-        <div class="sidebar-item">Make room for focus</div>
-        <div class="sidebar-item">Refine the finishing touches</div>
-        <div class="sidebar-label">Projects <span>›</span></div>
-        <button id="sidebar-settings" type="button">⚙ <span>Appearance</span></button>
+      <div class="page-surface _PageSurface_yl8z4_2"></div>
+      <div class="titlebar"><i></i><i></i><i></i><button id="toggle-sidebar" data-app-shell-sidebar-trigger aria-controls="app-shell-sidebar" type="button" aria-label="Toggle Sidebar" title="Toggle Sidebar"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="2.5" y="3.5" width="15" height="13" rx="2.5"/><path d="M7 4v12"/></svg></button><span class="window-title">Codex</span></div>
+      <aside class="app-shell-left-panel" data-app-shell-left-panel-appearance="default" style="width:276px">
+        <div class="preview-panel-clip flex min-w-0 overflow-hidden flex-1">
+          <div class="preview-panel-content" style="width:276px;min-width:276px;opacity:1">
+            <nav class="rail" data-app-navigation-rail="true" aria-label="App navigation">
+              <div class="rail-destinations">
+                <button id="native-home" data-sidebar-destination="builtin:home" type="button" aria-label="Home" title="Home">⌂</button>
+                <button type="button" aria-label="Spaces" title="Spaces">▱</button>
+                <button type="button" aria-label="Scheduled" title="Scheduled">◷</button>
+                <button type="button" aria-label="Plugins" title="Plugins">◎</button>
+                <button type="button" aria-label="More" title="More">⋯</button>
+              </div>
+              <div class="relative shrink-0 w-9 rail-footer">
+                <div class="flex items-center flex-col gap-2">
+                  <div class="flex items-center empty:hidden"></div>
+                  <div class="flex w-full"><div class="sidebar-item justify-center"><button id="profile-settings" class="rail-bottom" type="button" aria-label="Account and settings" title="Account and settings">NC</button></div></div>
+                </div>
+              </div>
+            </nav>
+            <div id="app-shell-sidebar" class="sidebar">
+              <div id="preview-chat-navigation" class="sidebar-navigation">
+                <strong>Codex <span>⌄</span></strong>
+                <div class="sidebar-action">＋ <span>New chat</span></div>
+                <div class="sidebar-label">Recents</div>
+                <div class="sidebar-item">A little more atmosphere</div>
+                <div class="sidebar-item">Make room for focus</div>
+                <div class="sidebar-item">Refine the finishing touches</div>
+                <div class="sidebar-label">Projects <span>›</span></div>
+              </div>
+              <nav id="preview-settings-navigation" class="sidebar-navigation" aria-label="Settings">
+                <header class="preview-settings-heading @container/navigation-header"><h1>Settings</h1></header>
+                <div class="sidebar-label">General</div>
+                <div class="sidebar-item" data-settings-panel-slug="appearance">Appearance</div>
+                <div class="sidebar-item">Notifications</div>
+                <div class="sidebar-item">Privacy</div>
+              </nav>
+              <button id="sidebar-settings" class="preview-sidebar-settings" type="button">⚙ <span>Appearance</span></button>
+            </div>
+          </div>
+        </div>
+        <div class="group/panel-resizer preview-panel-resizer" aria-hidden="true"></div>
       </aside>
       <main class="main">
         <section id="appearance-view" aria-labelledby="appearance-title">

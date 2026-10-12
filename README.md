@@ -22,15 +22,19 @@ Open **Settings → Appearance → Glow**. Everything lives in one place:
 - **Animation:** Pulse breathes, Bloom flows, Ping sends a trail of light around the frame.
 - **Finish:** adjust thickness, spread, intensity, saturation, gloss, and animation speed.
 
-Light and dark controls stay in sync with the app's Appearance setting. Your first tuned look transfers once to the other mode; after that, each stays independent so you can have a distinct look for each.
+Light and dark surfaces blend gently between modes; Reduce Motion keeps changes immediate. Light and dark controls stay in sync with the app's Appearance setting. Your first tuned look transfers once to the other mode; after that, each stays independent so you can have a distinct look for each.
 
 <p align="center">
   <img src="GitHub%20Photos/Screen%20Shot%203%20-%20Settings%20-%20Glow.png" alt="Glow settings: color controls, Soft and Neon vibes, Pulse, Bloom and Ping animations, and six adjustment sliders" width="760">
 </p>
 
+Glow also includes a tweak that improves your sidebar toggle. Once Glow is installed, you can use the normal sidebar toggle (top-left corner of chat) to further customize your experience.
+
+The existing **Toggle Sidebar** button beside the traffic lights cycles through three layouts: hide the chat list, bring it back with the icon rail tucked away, then restore both. Your account button stays in the lower-left corner. Settings keeps the rail tucked away and adds a small **Home** button beside its title. A full-width window icon identifies the hidden-rail layout.
+
 ## Install with one prompt
 
-**No Apple Developer account or Apple signing certificate required.** Glow 0.9.0 creates a private signing identity on your Mac and reuses it when you refresh. It stays inside your normal app and its Appearance settings.
+**No Apple Developer account or Apple signing certificate required.** Glow 0.10.5 creates a private signing identity on your Mac and reuses it when you refresh. It stays inside your normal app and its Appearance settings.
 
 The first switch to this identity may require approval for **“Codex Storage Key”** in macOS Keychain. Keeping the same identity lets macOS recognize subsequent Glow builds; a lost or replaced identity, changed app behavior, or security policy can still require approval. [How Keychain continuity works →](docs/install.md#keychain-and-your-local-identity)
 

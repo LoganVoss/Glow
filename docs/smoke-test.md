@@ -6,7 +6,7 @@ Record the patch version, app version/build, macOS version, display scaling, and
 
 ## Startup and recovery
 
-- [ ] The normal application path opens without a crash or signing error.
+- [ ] The normal application path opens past loading and reaches the chat UI without a crash or signing error. Test a cold launch.
 - [ ] Record any macOS Keychain authorization prompt on first launch, unchanged relaunch, and a subsequent rebuild. Distinguish successful launch after authorization from a prompt-free experience. Never record Always Allow as permanent across future app identities without evidence.
 - [ ] The expected account, existing chats, and projects are available.
 - [ ] The app can quit fully and reopen without losing settings.
@@ -41,9 +41,15 @@ Record the patch version, app version/build, macOS version, display scaling, and
 
 ## Border and motion
 
+- [ ] From Home/chat with both navigation areas visible, click the existing titlebar Toggle Sidebar: first hides the chat list, second restores it while hiding the icon rail, third restores both. Menu/keyboard commands follow the same cycle. The hidden-rail state has a distinct full-width window icon and an accessible state description; the two native states keep their original icons. There is no additional toggle or selected-box styling.
+- [ ] In the hidden-rail layout, the original account button and any update/usage controls remain usable in the bottom-left. Open Settings from the account menu: the rail stays hidden through loading; Home appears beside Settings and follows the existing guarded native navigation. Unsaved-change prompts remain functional.
+- [ ] Native hover/peek works after the first click and in the normal layout. Rail-only destinations retain their profile control and safe native panel width while the requested icon visibility stays consistent; returning to a chat/settings panel restores the expanded frame.
+- [ ] Rapid cycle reversals, changing appearance during a cycle, live resizing, and route replacements leave the frame aligned. With Reduce Motion, layout changes are immediate. The titlebar toggle retains its native disabled behavior in Settings; use Home to return.
+
 - [ ] The border follows the outer page frame and remains clear of titlebar and navigation controls.
 - [ ] Sidebar open/closed, window resizing, full screen, and different display scales preserve all four corners.
 - [ ] Light, dark, and system appearance retain the intended contrast without changing content colors.
+- [ ] Light/dark surfaces blend briefly (160 ms) while foregrounds and the selected theme update immediately, including native Appearance and Glow theme controls. Reverse mid-transition, type during it, and use the app’s native sidebar controls at the same time. There is no blocking layer or layout jump. Reduce Motion disables the dissolve.
 - [ ] Animation advances smoothly through a complete repeat, with no flash or visible restart. Bloom retains its established motion; Pulse breathes with stationary color and a visible quiet point; Ping retains its traveling trail.
 - [ ] Effective Reduce Motion stops continuous motion and dot/dice flourishes while preserving a usable static frame and aligned dots.
 - [ ] Motion resumes only when the relevant reduced-motion preference permits it.
