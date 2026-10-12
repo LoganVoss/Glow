@@ -26,7 +26,7 @@ Open **Settings → Appearance → Glow**. Everything lives in one place:
 - **Animation:** Pulse breathes, Bloom flows, Ping sends a trail of light around the frame.
 - **Finish:** adjust thickness, spread, intensity, saturation, gloss, and animation speed.
 
-Light and dark controls stay in sync with the app's Appearance setting. Your first tuned look transfers once to the other mode; after that, each stays independent. Colors blend smoothly, the glow dissolves on and off, and Reduce Motion is respected.
+Light and dark controls stay in sync with the app's Appearance setting. Your first tuned look transfers once to the other mode; after that, each stays independent so you can have a distinct look for each.
 
 <p align="center">
   <img src="GitHub%20Photos/Screen%20Shot%203%20-%20Settings%20-%20Glow.png" alt="Glow settings: color controls, Soft and Neon vibes, Pulse, Bloom and Ping animations, and six adjustment sliders" width="760">
