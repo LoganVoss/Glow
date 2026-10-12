@@ -11,10 +11,6 @@
 
 Glow wraps Codex in a continuous, softly diffused color border. Tune it inside **Settings → Appearance → Glow**, with separate light and dark looks and motion that stays with you as you move between chats and settings.
 
-**macOS · Apple silicon · MIT code · v0.8.9**
-
-An independent, experimental appearance patch. It integrates into your locally installed app; it is not (yet) an official OpenAI plugin or endorsed by OpenAI.
-
 ![Glow framing Codex in light mode](GitHub%20Photos/Screen%20Shot%201%20-%20Chat%20Window%20Light.png)
 
 ## Make it yours
@@ -94,5 +90,7 @@ This restores the immediately previous app bundle, which may be an earlier Glow 
 ---
 
 Original code © 2026 Logan Voss, released under the [MIT License](LICENSE). OpenAI and Apple artwork, names, and application imagery retain their respective rights; see [third-party notices](THIRD_PARTY_NOTICES.md).
+
+An independent, experimental appearance patch. It integrates into your locally installed app; it is not (yet) an official OpenAI plugin or endorsed by OpenAI.
 
 [Settings guide](docs/appearance.md) · [Contributing](CONTRIBUTING.md) · [Report an issue](https://github.com/LoganVoss/Glow/issues)
