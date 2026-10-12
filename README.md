@@ -32,12 +32,6 @@ Light and dark controls stay in sync with the app's Appearance setting. Your fir
   <img src="GitHub%20Photos/Screen%20Shot%203%20-%20Settings%20-%20Glow.png" alt="Glow settings: color controls, Soft and Neon vibes, Pulse, Bloom and Ping animations, and six adjustment sliders" width="760">
 </p>
 
-### See it in motion
-
-[![Watch the Glow video demo on YouTube](https://i.ytimg.com/vi/H-9Ug0_luwg/maxresdefault.jpg)](https://www.youtube.com/watch?v=H-9Ug0_luwg)
-
-[**Watch the full demo ↗**](https://www.youtube.com/watch?v=H-9Ug0_luwg)
-
 ## Install with one prompt
 
 Paste this into **Codex or ChatGPT with terminal access to your Mac**. A browser-only chat can explain the steps but cannot install local software.
