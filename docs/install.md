@@ -49,6 +49,18 @@ The installer does not quit or reopen the app. Do not start this waiting step fr
 
 ## Keychain and your local identity
 
+**On first launch**, macOS may show this prompt, including when migrating from an older Apple-signed or ad-hoc Glow build:
+
+<p align="center">
+  <img src="../GitHub%20Photos/Keychain%20Permission.png" alt="macOS asks ChatGPT to access Codex Storage Key, with Always Allow, Deny, and Allow choices" width="760">
+</p>
+
+Glow changes the app’s signing identity, so macOS asks it to regain access to its existing **“Codex Storage Key”**—this is expected reauthorization, not Glow collecting your password. [Why macOS asks](https://support.apple.com/guide/keychain-access/kyca1331/mac)
+
+For the ChatGPT/Codex app you just installed with Glow, **choose Always Allow** after entering your login Keychain password in this macOS dialog; this remembers access for that app identity. **Allow** grants only the current request. [Apple’s explanation](https://support.apple.com/guide/keychain-access/kyca1243/mac)
+
+Glow uses a persistent local signature, so you need **no Apple Developer account**; code signing is still in place.
+
 Glow creates a unique self-signed code-signing identity under:
 
 ```text
@@ -59,7 +71,7 @@ This identity is generated locally; it is **not an Apple-issued certificate** an
 
 Each signed code component has a designated requirement bound to its identifier and that exact certificate. Rebuilt versions can therefore satisfy the same identity requirement even when their executable code changes. A different signing key cannot gain access just by using the same app name. [Apple's code identity documentation](https://developer.apple.com/library/archive/documentation/Security/Conceptual/CodeSigningGuide/Procedures/Procedures.html)
 
-**On the first switch**, macOS may ask to let ChatGPT access **“Codex Storage Key”** in your login Keychain. This includes migration from an older Apple-signed or ad-hoc Glow build. Review the system dialog yourself. **Allow** grants the current request; **Always Allow** remembers authorization for that app identity. Reusing the same identity is designed to preserve that authorization across Glow refreshes. [Apple's authorization choices](https://support.apple.com/guide/keychain-access/kyca1243/mac)
+Reusing the same identity is designed to preserve that authorization across Glow refreshes.
 
 This does not promise that macOS will never ask again. Losing or replacing the local identity, certificate expiry, changed access requests, or macOS/managed-device policy can require reauthorization. Glow stops if recorded identity state is missing or mismatched instead of silently rotating the key. Ordinary app updates can still remove the appearance patch until you refresh it.
 
