@@ -28,9 +28,7 @@ Light and dark surfaces blend gently between modes; Reduce Motion keeps changes 
   <img src="GitHub%20Photos/Screen%20Shot%203%20-%20Settings%20-%20Glow.png" alt="Glow settings: color controls, Soft and Neon vibes, Pulse, Bloom and Ping animations, and six adjustment sliders" width="760">
 </p>
 
-Glow also includes a tweak that improves your sidebar toggle. Once Glow is installed, you can use the normal sidebar toggle (top-left corner of chat) to further customize your experience.
-
-The existing **Toggle Sidebar** button beside the traffic lights cycles through three layouts: hide the chat list, bring it back with the icon rail tucked away, then restore both. Your account button stays in the lower-left corner. Settings keeps the rail tucked away and adds a small **Home** button beside its title. A full-width window icon identifies the hidden-rail layout.
+Glow also includes a sidebar toggle tweak. Once Glow is installed, you can use the normal sidebar toggle (top-left corner of chat) to further customize your experience.
 
 ## Install with one prompt
 
