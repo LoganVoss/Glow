@@ -32,7 +32,7 @@ Glow also includes a sidebar toggle tweak. Once Glow is installed, you can use t
 
 ## Install with one prompt
 
-**No Apple Developer account or Apple signing certificate required.** Glow 0.10.5 creates a private signing identity on your Mac and reuses it when you refresh. It stays inside your normal app and its Appearance settings.
+**No Apple Developer account or Apple signing certificate required.** Glow 0.10.6 creates a private signing identity on your Mac and reuses it when you refresh. It stays inside your normal app and its Appearance settings.
 
 This is an experimental local modification, **not notarized**. It adds an app-scoped library-validation exception and removes vendor team-bound capabilities. Hardened runtime, Electron fuses, and Content Security Policy are preserved; system-wide protections and quarantine are unchanged. [Verification and remaining native checks →](docs/verification.md)
 
@@ -76,7 +76,7 @@ For the ChatGPT/Codex app you just installed with Glow, **choose Always Allow** 
 
 Glow uses a persistent local signature, so you need **no Apple Developer account**; code signing is still in place. Keeping that identity supports authorization across refreshes, although a lost or replaced identity, changed app behavior, or security policy can still require approval. [How Keychain continuity works →](docs/install.md#keychain-and-your-local-identity)
 
-The current reviewed sources are `/Applications/ChatGPT.app`, bundle ID `com.openai.codex`, versions **26.1007.30912 (20156)** and **26.1007.21159 (20052)** on Apple silicon. Build tools: Node.js 22.12+, Git, Python 3, and macOS command-line tools. [Manual setup and certificate-based mode →](docs/install.md)
+The current reviewed sources are `/Applications/ChatGPT.app`, bundle ID `com.openai.codex`, versions **26.1007.71326 (20398)**, **26.1007.30912 (20156)**, and **26.1007.21159 (20052)** on Apple silicon. Build tools: Node.js 22.12+, Git, Python 3, and macOS command-line tools. [Manual setup and certificate-based mode →](docs/install.md)
 
 ## After an app update
 

@@ -1,5 +1,19 @@
 # Verification
 
+## 0.10.6 — App update compatibility, October 14, 2026
+
+The installed app **26.1007.71326 (20398)** was confirmed up to date through its configured updater. The old compatibility check refused its renamed native sidebar command. Review of the actual OpenAI-signed archive confirmed the same callback behavior, disabled guard, memoization, and titlebar/menu/keyboard registration; the new bindings are now an explicit reviewed variant. The complete hook must match, and unknown, mixed, duplicate, or modified hooks are rejected. All three actual vendor sources (**20398**, **20156**, **20052**) pass the inspector. Removing the optional bridge restores each original renderer byte for byte; no native dependency on Glow is introduced.
+
+The actual Appearance mount, scoped non-optimistic theme writer, rail/footer/account structure, panel geometry, and guarded Home destination were reviewed against the preserved previous build. Glow's runtime and visual assets required no changes. The source pin records the verified new archive and linked asset hashes after this review.
+
+The package audit also found that a moved checkout could leave Restore unable to use an intact backup. Restore now validates the historical canonical path pair and its record-directory/build-ID binding, then uses only the current checkout's fixed backup/staging locations. It preserves historical paths and all bundle/signature checks. Synthetic restore exchanges cover moved backups and interrupted staging, malformed paths, mismatched IDs/roots, and symlink redirects. The actual moved checkout's read-only Restore preflight passes; no restoration was performed.
+
+Passed: **37** preference/runtime tests, **23** Glow browser cases, **10** theme cases, **4** early-window startup cases, **19** sidebar cases, **19** compatibility tests, **14** native command tests, **26** refresh tests, **68** signing-policy tests, **18** recovery groups, and the installer/archive checks. The package audit found no known dependency vulnerabilities, broken local documentation links, missing executable launchers, or tracked private artifacts. The README edit already on GitHub was preserved.
+
+Preparation returned **READY** for Glow **0.10.6** on build **20398**, reused the persistent local identity, verified all **110 code objects**, and passed installation preflight. All nine source hashes and five packaged JavaScript modules match the final source. Exactly nine packed renderer entries changed as allowed; expected unpacked signing/integrity changes are accounted for separately. CSP, Electron fuses, original packed payload, the preserved vendor original, and the installed baseline passed preservation checks.
+
+All **three** isolated packaged-bootstrap cases passed: normal, deliberately failing, and missing Glow. The normal case also imports the actual Settings and patched Appearance modules without renderer or dependency errors. Native Settings remains byte-identical to the original, and the initial renderer equals the exact reviewed command transformation. The hosted app was not quit, replaced, or launched. These source, signature, and isolated-module checks do not establish native sign-in, account integrations, or sustained performance; complete the [native smoke test](smoke-test.md) after installation.
+
 ## 0.10.5 — Sidebar state and motion polish, October 12, 2026
 
 The hidden-rail layout now has a distinct full-width window icon on the original titlebar control and an accessible state description. Its native button, handlers, original icons for the other two states, and hover treatment remain intact. The icon is a local CSS mask permitted by the existing CSP; no policy changes or network requests are needed.

@@ -1,23 +1,41 @@
 import assert from 'node:assert/strict';
 
-// This exact callback is shared by the native titlebar, menu and keyboard
-// command in both reviewed vendor builds. Keep native startup independent of
-// Glow: an absent or failed optional bridge falls through to the original code.
-export const SIDEBAR_CALLBACK = 'a=()=>{if(!i)return;let n=!e.get(gC);$Rt(e,n,{animate:t,transition:n&&e.get(WH)?.type===`peek`?{type:`tween`,duration:.12,ease:[0,0,.58,1]}:void 0})}';
-export const SIDEBAR_REGISTRATION = 'let o=a;Pw(`toggleSidebar`,o);let s;r[4]!==i||r[5]!==e||r[6]!==t?(s=[i,e,t],r[4]=i,r[5]=e,r[6]=t,r[7]=s):s=r[7],xs(`toggle-sidebar`,o,s)';
-const OPEN_OPTIONS = 'animate:t,transition:__neonOpen&&e.get(WH)?.type===`peek`?{type:`tween`,duration:.12,ease:[0,0,.58,1]}:void 0';
-export const SIDEBAR_BRIDGE = `try{if(globalThis.__neonCodexRuntime?.cycleSidebar?.({open:e.get(gC),setOpen:__neonOpen=>$Rt(e,__neonOpen,{${OPEN_OPTIONS}})})===true)return}catch{}`;
+// Complete reviewed command hooks, including React memoization and both native
+// registrations. Minifier renames are accepted only as explicitly reviewed
+// variants; unknown or mixed bindings must never be inferred from a new build.
+export const SIDEBAR_VARIANTS = Object.freeze([
+  Object.freeze({
+    id: '20052-20156',
+    hook: 'function Qni(e,t,n){let r=(0,$ni.c)(8),i=n===void 0||n,a;r[0]!==i||r[1]!==e||r[2]!==t?(a=()=>{if(!i)return;let n=!e.get(gC);$Rt(e,n,{animate:t,transition:n&&e.get(WH)?.type===`peek`?{type:`tween`,duration:.12,ease:[0,0,.58,1]}:void 0})},r[0]=i,r[1]=e,r[2]=t,r[3]=a):a=r[3];let o=a;Pw(`toggleSidebar`,o);let s;r[4]!==i||r[5]!==e||r[6]!==t?(s=[i,e,t],r[4]=i,r[5]=e,r[6]=t,r[7]=s):s=r[7],xs(`toggle-sidebar`,o,s)}',
+    callback: 'a=()=>{if(!i)return;let n=!e.get(gC);$Rt(e,n,{animate:t,transition:n&&e.get(WH)?.type===`peek`?{type:`tween`,duration:.12,ease:[0,0,.58,1]}:void 0})}',
+    registration: 'let o=a;Pw(`toggleSidebar`,o);let s;r[4]!==i||r[5]!==e||r[6]!==t?(s=[i,e,t],r[4]=i,r[5]=e,r[6]=t,r[7]=s):s=r[7],xs(`toggle-sidebar`,o,s)',
+    bridge: 'try{if(globalThis.__neonCodexRuntime?.cycleSidebar?.({open:e.get(gC),setOpen:__neonOpen=>$Rt(e,__neonOpen,{animate:t,transition:__neonOpen&&e.get(WH)?.type===`peek`?{type:`tween`,duration:.12,ease:[0,0,.58,1]}:void 0})})===true)return}catch{}',
+  }),
+  Object.freeze({
+    id: '20398',
+    hook: 'function qni(e,t,n){let r=(0,Jni.c)(8),i=n===void 0||n,a;r[0]!==i||r[1]!==e||r[2]!==t?(a=()=>{if(!i)return;let n=!e.get(rC);fzt(e,n,{animate:t,transition:n&&e.get(YH)?.type===`peek`?{type:`tween`,duration:.12,ease:[0,0,.58,1]}:void 0})},r[0]=i,r[1]=e,r[2]=t,r[3]=a):a=r[3];let o=a;xw(`toggleSidebar`,o);let s;r[4]!==i||r[5]!==e||r[6]!==t?(s=[i,e,t],r[4]=i,r[5]=e,r[6]=t,r[7]=s):s=r[7],xs(`toggle-sidebar`,o,s)}',
+    callback: 'a=()=>{if(!i)return;let n=!e.get(rC);fzt(e,n,{animate:t,transition:n&&e.get(YH)?.type===`peek`?{type:`tween`,duration:.12,ease:[0,0,.58,1]}:void 0})}',
+    registration: 'let o=a;xw(`toggleSidebar`,o);let s;r[4]!==i||r[5]!==e||r[6]!==t?(s=[i,e,t],r[4]=i,r[5]=e,r[6]=t,r[7]=s):s=r[7],xs(`toggle-sidebar`,o,s)',
+    bridge: 'try{if(globalThis.__neonCodexRuntime?.cycleSidebar?.({open:e.get(rC),setOpen:__neonOpen=>fzt(e,__neonOpen,{animate:t,transition:__neonOpen&&e.get(YH)?.type===`peek`?{type:`tween`,duration:.12,ease:[0,0,.58,1]}:void 0})})===true)return}catch{}',
+  }),
+]);
+
+// Preserve the original variant exports for existing source consumers.
+export const SIDEBAR_CALLBACK = SIDEBAR_VARIANTS[0].callback;
+export const SIDEBAR_REGISTRATION = SIDEBAR_VARIANTS[0].registration;
+export const SIDEBAR_BRIDGE = SIDEBAR_VARIANTS[0].bridge;
 const count = (source, text) => source.split(text).length - 1;
 
 export function patchSidebarCycle(source) {
-  assert.equal(count(source, SIDEBAR_CALLBACK), 1, 'Expected exactly one reviewed native sidebar command callback');
-  assert.equal(count(source, SIDEBAR_REGISTRATION), 1, 'Expected native titlebar/menu sidebar command registration');
   assert.ok(!source.includes('__neonCodexRuntime') && !source.includes('__neonOpen'), 'Native sidebar command is already patched or reserved names collide');
-  const start = source.indexOf('function Qni(e,t,n){');
-  const callback = source.indexOf(SIDEBAR_CALLBACK);
-  assert.ok(start >= 0 && callback > start && callback - start < 160, 'Native sidebar callback is no longer in the reviewed command hook');
-  const registration = source.indexOf(SIDEBAR_REGISTRATION, callback);
-  assert.ok(registration > callback && registration - callback < SIDEBAR_CALLBACK.length + 100,
-    'Native sidebar callback no longer belongs to both registered command paths');
-  return source.replace(SIDEBAR_CALLBACK, SIDEBAR_CALLBACK.replace('if(!i)return;', `if(!i)return;${SIDEBAR_BRIDGE}`));
+  const occurrences = key => SIDEBAR_VARIANTS.reduce((total, variant) => total + count(source, variant[key]), 0);
+  assert.equal(occurrences('callback'), 1, 'Expected exactly one reviewed native sidebar command callback');
+  assert.equal(occurrences('registration'), 1, 'Expected exactly one reviewed native titlebar/menu sidebar command registration');
+  assert.equal(occurrences('hook'), 1, 'Expected exactly one complete reviewed native sidebar command hook');
+  const variant = SIDEBAR_VARIANTS.find(candidate => source.includes(candidate.hook));
+  // Keep native startup independent of Glow: absent, declining or failed optional
+  // code falls through to the unchanged native callback without new imports.
+  const patchedHook = variant.hook.replace(variant.callback,
+    variant.callback.replace('if(!i)return;', `if(!i)return;${variant.bridge}`));
+  return source.replace(variant.hook, patchedHook);
 }

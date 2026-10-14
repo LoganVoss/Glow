@@ -2,6 +2,7 @@
 .local/
 *.app
 *.zip
+*.zip.sha256
 *.tar
 *.tar.gz
 *.tgz

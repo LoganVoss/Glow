@@ -169,3 +169,126 @@ with tempfile.TemporaryDirectory(prefix='neon-snapshot-test-') as directory:
             must_reject(lambda: m.require_snapshot(changed, expected, 'Installed app'), 'refusing to swap')
     m.require_snapshot(dict(expected, app='/relocated/ChatGPT.app'), expected, 'Relocated app')
     print('PASS: version/build changes explain rebuild action; byte/signature mismatches still reject')
+
+
+def relocated_record(base, state='installed', at_staging=False):
+    """Keep the target fixed while the entire checkout moves, as on a real Mac."""
+    old_local = base / 'old checkout' / '.local'
+    configure(old_local)
+    m.APP = base / 'Applications' / 'ChatGPT.app'
+    build_id = str(uuid.uuid4())
+    backup = m.RECOVERY / build_id / 'ChatGPT.app'
+    bundle(m.APP, 'current')
+    bundle(m.STAGED if at_staging else backup, 'previous')
+    baseline = m.snapshot(m.STAGED if at_staging else backup)
+    record_file, record = record_for(build_id, baseline, m.snapshot(m.APP), state)
+    old_local.parent.rename(base / 'moved checkout')
+    configure(base / 'moved checkout' / '.local')
+    m.APP = base / 'Applications' / 'ChatGPT.app'
+    return m.RECOVERY / build_id / 'record.json', record
+
+
+for at_staging in (False, True):
+    with tempfile.TemporaryDirectory(prefix='neon-relocated-restore-') as directory:
+        base = Path(directory).resolve()
+        record_file, record = relocated_record(
+            base, 'exchanged' if at_staging else 'installed', at_staging)
+        original_record = record_file.read_bytes()
+        original_pointer = m.LATEST.read_bytes()
+        previous = m.STAGED if at_staging else record_file.parent / 'ChatGPT.app'
+        plan = m.preflight('restore')
+        assert plan['replacement'] == previous
+        assert record_file.read_bytes() == original_record and m.LATEST.read_bytes() == original_pointer
+        assert not (base / 'old checkout').exists()
+
+        # Relocation never relaxes byte/signature checks on the incoming bundle.
+        archive = previous / m.FILES['archive']
+        contents = archive.read_bytes()
+        archive.write_bytes(b'changed after moving')
+        must_reject(lambda: m.preflight('restore'), 'Previous app backup differs')
+        archive.write_bytes(contents)
+        m.signature = lambda app: dict(SIGNATURE, cdHash='wrong signature')
+        must_reject(lambda: m.preflight('restore'), 'Previous app backup differs')
+        m.signature = lambda app: dict(SIGNATURE)
+
+        with contextlib.redirect_stdout(io.StringIO()):
+            m.wait_and_swap('restore', 5)
+        assert m.comparable(m.snapshot(m.APP)) == m.comparable(record['baseline'])
+        restored = json.loads(record_file.read_text())
+        assert restored['state'] == 'restored'
+        assert restored['backupPath'] == record['backupPath']
+        assert restored['stagedPath'] == record['stagedPath']
+        assert restored['baseline'] == record['baseline']
+        displaced = record_file.parent / 'Replaced Neon Codex.app'
+        assert restored['displacedBuildPath'] == str(displaced)
+        assert m.comparable(m.snapshot(displaced)) == m.comparable(record['replacement'])
+        print('PASS: moved checkout restores verified previous app from ' +
+              ('interrupted staging' if at_staging else 'recovery backup') +
+              ' without rewriting historical paths')
+
+with tempfile.TemporaryDirectory(prefix='neon-relocated-prepared-') as directory:
+    base = Path(directory).resolve()
+    record_file, record = relocated_record(base, 'prepared', True)
+    # This prepared build was never exchanged: current app is the baseline and
+    # staging holds the incoming replacement, even after the checkout moves.
+    record['baseline'], record['replacement'] = record['replacement'], record['baseline']
+    m.atomic_json(record_file, record)
+    original_record = record_file.read_bytes()
+    original_pointer = m.LATEST.read_bytes()
+    assert m.preflight('restore')['noExchange'] is True
+    assert record_file.read_bytes() == original_record and m.LATEST.read_bytes() == original_pointer
+    print('PASS: moved prepared record recognizes no exchange with unchanged journal')
+
+with tempfile.TemporaryDirectory(prefix='neon-relocated-invalid-') as directory:
+    base = Path(directory).resolve()
+    record_file, original = relocated_record(base)
+    old_local = base / 'old checkout' / '.local'
+    other_id = str(uuid.uuid4())
+    malformed = [
+        {'buildId': other_id},
+        {'backupPath': str(old_local / 'recovery' / other_id / 'ChatGPT.app')},
+        {'stagedPath': str(base / 'unrelated' / '.local' / 'staging' / 'ChatGPT.app')},
+        {'backupPath': str(base / 'not-local' / 'recovery' / original['buildId'] / 'ChatGPT.app'),
+         'stagedPath': str(base / 'not-local' / 'staging' / 'ChatGPT.app')},
+        {'backupPath': str(old_local / 'recovery') + '/../recovery/' + original['buildId'] + '/ChatGPT.app'},
+        {'stagedPath': str(old_local) + '/./staging/ChatGPT.app'},
+        {'stagedPath': str(old_local) + '//staging/ChatGPT.app'},
+        {'backupPath': '/' + str(old_local / 'recovery' / original['buildId'] / 'ChatGPT.app'),
+         'stagedPath': '/' + str(old_local / 'staging' / 'ChatGPT.app')},
+        {'backupPath': str(old_local.parent) + '\0/.local/recovery/' + original['buildId'] + '/ChatGPT.app',
+         'stagedPath': str(old_local.parent) + '\0/.local/staging/ChatGPT.app'},
+        {'stagedPath': str(old_local / 'staging' / 'ChatGPT.app') + '/'},
+        {'backupPath': 'relative/.local/recovery/' + original['buildId'] + '/ChatGPT.app'},
+        {'backupPath': '/ChatGPT.app'},
+        {'backupPath': None},
+    ]
+    for changes in malformed:
+        m.atomic_json(record_file, dict(original, **changes))
+        before = record_file.read_bytes()
+        must_reject(lambda: m.preflight('restore'), 'recovery')
+        assert record_file.read_bytes() == before
+    print('PASS: relocated recovery rejects wrong build IDs, roots, traversal, and noncanonical paths')
+
+for redirected in ('pointer', 'record', 'record directory', 'backup', 'staging', 'dangling backup'):
+    with tempfile.TemporaryDirectory(prefix='neon-relocated-symlink-') as directory:
+        base = Path(directory).resolve()
+        record_file, record = relocated_record(base)
+        backup = record_file.parent / 'ChatGPT.app'
+        if redirected == 'pointer':
+            candidate = m.LATEST
+        elif redirected == 'record':
+            candidate = record_file
+        elif redirected == 'record directory':
+            candidate = record_file.parent
+        elif redirected == 'staging':
+            bundle(m.STAGED, 'unrelated staged build')
+            candidate = m.STAGED.parent
+        else:
+            candidate = backup
+        target = base / 'redirected target'
+        candidate.rename(target)
+        candidate.symlink_to(base / 'missing' if redirected == 'dangling backup' else target)
+        must_reject(lambda: m.preflight('restore'),
+                    'real directory' if redirected == 'record directory' else 'redirected')
+        assert candidate.is_symlink()
+        print('PASS: relocated recovery rejects symlink redirect in ' + redirected)

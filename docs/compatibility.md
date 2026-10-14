@@ -2,9 +2,9 @@
 
 Glow can inspect an updated app without a signing certificate. The check reads the installed app, finds its actual renderer assets, and checks whether Glow’s native Appearance integration still fits. It never patches, signs, installs, launches, or changes preferences.
 
-Glow 0.10.5 also checks the native Toggle Sidebar command and its exact shared titlebar/menu registration. Its optional callback falls back to native behavior when Glow is absent or fails. No Glow import is added to native startup, and the native Settings module remains unchanged. Review the rail, footer, panel geometry, and guarded Home destination when adapting a new build; hashes alone do not establish compatibility.
+Glow 0.10.6 also checks the native Toggle Sidebar command and its exact shared titlebar/menu registration. Its optional callback falls back to native behavior when Glow is absent or fails. No Glow import is added to native startup, and the native Settings module remains unchanged. Review the rail, footer, panel geometry, and guarded Home destination when adapting a new build; hashes alone do not establish compatibility. Build **20398** uses an explicitly reviewed command variant alongside the existing **20052/20156** variant. The complete command, memoization, and both registrations must match; unknown or mixed bindings are refused.
 
-Glow 0.10.5 builds locally with a persistent identity it generates on your Mac. No Apple certificate or new publisher signature is required per update. Retain `~/Library/Application Support/Glow/Signing` and your checkout’s `.local/` recovery records.
+Glow 0.10.6 builds locally with a persistent identity it generates on your Mac. No Apple certificate or new publisher signature is required per update. Retain `~/Library/Application Support/Glow/Signing` and your checkout’s `.local/` recovery records.
 
 From the Glow repository, after `npm ci --ignore-scripts`:
 

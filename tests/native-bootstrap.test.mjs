@@ -5,7 +5,7 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { extractFile, listPackage } from '@electron/asar';
 import { chromium } from 'playwright';
-import { patchSidebarCycle, SIDEBAR_BRIDGE } from '../scripts/sidebar-cycle-patch.mjs';
+import { patchSidebarCycle, SIDEBAR_VARIANTS } from '../scripts/sidebar-cycle-patch.mjs';
 
 // Opt-in, read-only verification of a locally prepared app archive. No vendor
 // code is checked in or written to disk. Only webview assets are served to a
@@ -33,8 +33,8 @@ test('prepared native renderer starts independently of the optional Glow entry',
     .map(match => path.posix.normalize(`webview/${match[1]}`))
     .filter(file => /^webview\/assets\/index-[\w-]+\.js$/.test(file));
   assert.equal(entries.length, 1, 'Expected one reviewed native entry module');
-  const initial = listPackage(archive).map(file => file.replace(/^\//, ''))
-    .filter(file => /^webview\/assets\/app-initial-[\w-]+\.js$/.test(file));
+  const packageFiles = listPackage(archive).map(file => file.replace(/^\//, ''));
+  const initial = packageFiles.filter(file => /^webview\/assets\/app-initial-[\w-]+\.js$/.test(file));
   assert.equal(initial.length, 1, 'Expected one reviewed native initial renderer');
   const bootstrapFiles = [...initial, ...entries];
   const initialSource = extractFile(archive, initial[0]).toString();
@@ -44,8 +44,15 @@ test('prepared native renderer starts independently of the optional Glow entry',
   assert.equal(settingsImports.length, 1, 'Expected one reviewed native Settings lazy import');
   const settingsFile = path.posix.normalize(`webview/assets/${settingsImports[0][1]}`);
   const settingsSource = extractFile(archive, settingsFile).toString();
-  assert.equal(initialSource.split(SIDEBAR_BRIDGE).length - 1, 1,
-    'The native command must contain exactly one reviewed optional bridge');
+  const appearanceFiles = packageFiles.filter(file => /^webview\/assets\/appearance-settings-[\w-]+\.js$/.test(file));
+  assert.equal(appearanceFiles.length, 1, 'Expected one patched native Appearance module');
+  const appearanceFile = appearanceFiles[0];
+  const bridgeCount = SIDEBAR_VARIANTS.reduce((total, variant) =>
+    total + initialSource.split(variant.bridge).length - 1, 0);
+  assert.equal(bridgeCount, 1, 'The native command must contain exactly one reviewed optional bridge');
+  const matchingHooks = SIDEBAR_VARIANTS.reduce((total, variant) =>
+    total + initialSource.split(patchSidebarCycle(variant.hook)).length - 1, 0);
+  assert.equal(matchingHooks, 1, 'The native command must match one complete reviewed patched hook');
   assert.doesNotMatch(settingsSource, /__neon(?:Rail|Settings)|data-neon-rail|data-neon-settings-(?:home|navigation|loading)/,
     'Native Settings stays untouched; optional Home belongs to the independent Glow runtime');
   for (const source of [initialSource, settingsSource]) {
@@ -59,7 +66,7 @@ test('prepared native renderer starts independently of the optional Glow entry',
     assert.deepEqual(extractFile(archive, settingsFile), extractFile(originalArchive, settingsFile),
       'Native Settings must remain byte-for-byte identical to the preserved original');
   }
-  const observed = new Set([...bootstrapFiles, settingsFile]);
+  const observed = new Set([...bootstrapFiles, settingsFile, appearanceFile]);
 
   const server = createServer((request, response) => {
     try {
@@ -127,6 +134,17 @@ test('prepared native renderer starts independently of the optional Glow entry',
             'Unmodified Settings chunk completes evaluation after native startup');
           assert.deepEqual(errors, [], 'Settings lazy import must not raise renderer errors');
           assert.deepEqual(failedAssets, [], 'Settings lazy import must resolve its local dependency graph');
+          const appearanceShape = await page.evaluate(async url => {
+            const module = await import(url);
+            return { appearanceSettings: typeof module.AppearanceSettings };
+          }, `${origin}/${mode}/${appearanceFile}`);
+          assert.deepEqual(appearanceShape, { appearanceSettings: 'function' },
+            'Patched Appearance module links its settings bridge and exports its native React component');
+          await page.waitForTimeout(100);
+          assert.deepEqual(await page.evaluate(marker => globalThis[marker], MARKER),
+            [...bootstrapFiles, settingsFile, appearanceFile], 'Patched Appearance completes evaluation after Settings');
+          assert.deepEqual(errors, [], 'Patched Appearance import must not raise renderer errors');
+          assert.deepEqual(failedAssets, [], 'Patched Appearance import must resolve its local dependency graph');
         }
       } finally { await context.close(); }
     });

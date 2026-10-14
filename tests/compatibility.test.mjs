@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createHash } from 'node:crypto';
 import { inspectStructure, APPEARANCE_NEEDLE } from '../scripts/compatibility.mjs';
-import { SIDEBAR_CALLBACK, SIDEBAR_REGISTRATION } from '../scripts/sidebar-cycle-patch.mjs';
+import { SIDEBAR_VARIANTS } from '../scripts/sidebar-cycle-patch.mjs';
 
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
-function fixture() {
+function fixture(variant = SIDEBAR_VARIANTS[0]) {
   const assets = new Map(Object.entries({
     'webview/index.html': '<head><meta http-equiv="Content-Security-Policy" content="default-src \'self\'">\n<link href="./assets/app-shared-a1.css">\n<script type="module" src="./assets/entry-a1.js"></script>\n</head><body></body>',
     'webview/assets/app-shared-a1.css': ':root{color:black}',
@@ -14,7 +14,7 @@ function fixture() {
     'webview/assets/app-shared-a1.js': 'export{a as Fan,b as H0t,c as p3t,d as wjt,e as Agn,f as PCn};',
     'webview/assets/general-settings-a1.js': 'import{Fan as N,H0t as P,p3t as Xt,wjt as V}from"./app-shared-a1.js";function theme(){let t=N(P);return e=>V(t,Xt.theme,e,{optimistic:!1})}',
     'webview/assets/entry-a1.js': 'import "./app-initial-a1.js";',
-    'webview/assets/app-initial-a1.js': `function Qni(e,t,n){let r=[],i=n===void 0||n,a;${SIDEBAR_CALLBACK};${SIDEBAR_REGISTRATION}}`,
+    'webview/assets/app-initial-a1.js': variant.hook,
   }));
   const integrity = { 'Resources/app.asar': { algorithm: 'SHA256', hash: 'ab'.repeat(32) } };
   const info = { CFBundleIdentifier: 'com.openai.codex', CFBundleShortVersionString: '99.1', CFBundleVersion: '999', ElectronAsarIntegrity: integrity };
@@ -43,6 +43,19 @@ test('unknown build with intact structural anchors yields a proposal, not suppor
   assert.equal(JSON.stringify([...f.assets]), before);
   assert.equal(result.readOnly, true);
 });
+test('reviewed updated sidebar variant remains a candidate until its complete source is pinned', () => {
+  const f = fixture(SIDEBAR_VARIANTS[1]);
+  const result = inspect(f);
+  assert.equal(result.status, 'compatible-candidate', result.reason);
+  assert.equal(inspect(f, { [result.candidateSourcePin.key]: result.candidateSourcePin.value }).status, 'compatible-known');
+  change(f, 'app-initial-', '(8)', '(9)');
+  reject(f, /complete reviewed native sidebar command hook/);
+});
+test('mixed old and new sidebar bindings cannot pass compatibility review', () => {
+  const f = fixture(SIDEBAR_VARIANTS[1]);
+  change(f, 'app-initial-', SIDEBAR_VARIANTS[1].callback, SIDEBAR_VARIANTS[0].callback);
+  reject(f, /complete reviewed native sidebar command hook/);
+});
 test('known build must match every recorded source field', () => {
   const f = fixture(), proposal = inspect(f).candidateSourcePin;
   assert.equal(inspect(f, { [proposal.key]: proposal.value }).status, 'compatible-known');
@@ -66,7 +79,7 @@ test('native sidebar command structural changes and unlinked renderer are refuse
 });
 test('known build rejects changes to native initial renderer even when hook still matches', () => {
   const f=fixture(), proposal=inspect(f).candidateSourcePin;
-  change(f,'app-initial-','let r=[]','let r=[null]');
+  change(f,'app-initial-',SIDEBAR_VARIANTS[0].hook,`${SIDEBAR_VARIANTS[0].hook}/* unrelated vendor change */`);
   const result=inspect(f,{[proposal.key]:proposal.value});
   assert.equal(result.status,'unsupported');
   assert.match(result.reason,/Reviewed source pin mismatch: initialRendererHash/);

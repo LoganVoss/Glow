@@ -1,62 +1,95 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
-import { patchSidebarCycle, SIDEBAR_CALLBACK, SIDEBAR_REGISTRATION, SIDEBAR_BRIDGE } from '../scripts/sidebar-cycle-patch.mjs';
+import { patchSidebarCycle, SIDEBAR_VARIANTS } from '../scripts/sidebar-cycle-patch.mjs';
 
-const fixture = () => `function Qni(e,t,n){let r=[],i=n===void 0||n,a;${SIDEBAR_CALLBACK};${SIDEBAR_REGISTRATION}}`;
-function harness(runtime, { open=true, enabled=true, peek=false, animate=true }={}) {
-  const calls=[], handlers={}, state={open};
-  const context=vm.createContext({__neonCodexRuntime:runtime,gC:'open',WH:'peek',Pw:(name,handler)=>{handlers.command=handler;},xs:(name,handler)=>{handlers.ipc=handler;},$Rt:(scope,value,options)=>{state.open=value;calls.push({value,options});}});
-  vm.runInContext(patchSidebarCycle(fixture()),context);
-  context.Qni({get:key=>key==='open'?state.open:peek?{type:'peek'}:null},animate,enabled);
-  return {calls,handlers,state};
+const bindings = {
+  '20052-20156': { hook: 'Qni', memo: '$ni', open: 'gC', peek: 'WH', writer: '$Rt', command: 'Pw' },
+  '20398': { hook: 'qni', memo: 'Jni', open: 'rC', peek: 'YH', writer: 'fzt', command: 'xw' },
+};
+function harness(variant, runtime, { open=true, enabled=true, peek=false, animate=true }={}) {
+  const calls=[], handlers={}, state={open}, cache=Array(8).fill(Symbol('unset'));
+  const names=bindings[variant.id];
+  const context=vm.createContext({
+    __neonCodexRuntime:runtime,
+    [names.memo]:{c:size=>{assert.equal(size,8);return cache;}},
+    [names.open]:'open', [names.peek]:'peek',
+    [names.command]:(name,handler)=>{assert.equal(name,'toggleSidebar');handlers.command=handler;},
+    xs:(name,handler)=>{assert.equal(name,'toggle-sidebar');handlers.ipc=handler;},
+    [names.writer]:(scope,value,options)=>{state.open=value;calls.push({value,options});},
+  });
+  vm.runInContext(patchSidebarCycle(variant.hook),context);
+  const scope={get:key=>key==='open'?state.open:peek?{type:'peek'}:null};
+  const render=(nextEnabled=enabled)=>context[names.hook](scope,animate,nextEnabled);
+  render();
+  return {calls,handlers,state,render};
 }
-test('only native callback changes; native registration and module dependencies stay intact',()=>{
-  const source=fixture(), patched=patchSidebarCycle(source);
-  assert.equal(patched.replace(SIDEBAR_BRIDGE,''),source);
-  assert.equal(patched.includes('import'),false);
-  assert.equal(patched.includes(SIDEBAR_REGISTRATION),true);
+for (const variant of SIDEBAR_VARIANTS) {
+  test(`${variant.id}: only native callback changes; registration and dependencies stay intact`,()=>{
+    const source=`/* before */${variant.hook}/* after */`, patched=patchSidebarCycle(source);
+    assert.equal(patched.replace(variant.bridge,''),source);
+    assert.equal(patched.includes('import'),false);
+    assert.equal(patched.includes(variant.registration),true);
+  });
+  test(`${variant.id}: absent, missing, declining and throwing bridges retain native toggle`,()=>{
+    for(const runtime of [undefined,{}, {cycleSidebar:()=>false},{cycleSidebar:()=>undefined},{cycleSidebar:()=>{throw Error('optional failure');}}]) {
+      const h=harness(variant,runtime);
+      h.handlers.command();
+      assert.equal(h.state.open,false);
+      assert.equal(h.calls.length,1);
+      h.handlers.ipc();
+      assert.equal(h.state.open,true);
+      assert.equal(h.calls.length,2);
+    }
+  });
+  test(`${variant.id}: three-state runtime consumes opening and restores without double toggle`,()=>{
+    let hidden=false;
+    const h=harness(variant,{cycleSidebar:({open,setOpen})=>{
+      if(hidden){hidden=false;return true;}
+      if(!open){hidden=true;setOpen(true);return true;}
+      return false;
+    }});
+    h.handlers.command(); assert.equal(h.state.open,false);assert.equal(hidden,false);
+    h.handlers.ipc(); assert.equal(h.state.open,true);assert.equal(hidden,true);
+    h.handlers.command(); assert.equal(h.state.open,true);assert.equal(hidden,false);
+    assert.deepEqual(h.calls.map(x=>x.value),[false,true]);
+  });
+  test(`${variant.id}: native memoization retains handlers and refreshes disabled state`,()=>{
+    const h=harness(variant,{cycleSidebar:()=>assert.fail('disabled bridge called')},{enabled:false});
+    const original=h.handlers.command;
+    h.render();assert.equal(h.handlers.command,original);assert.equal(h.handlers.ipc,original);
+    h.handlers.command();h.handlers.ipc();assert.equal(h.calls.length,0);
+    h.render(true);assert.notEqual(h.handlers.command,original);assert.equal(h.handlers.ipc,h.handlers.command);
+  });
+  test(`${variant.id}: native animation and peek options are preserved by setOpen`,()=>{
+    for(const animate of [true,false])for(const peek of [true,false]){
+      const h=harness(variant,{cycleSidebar:({setOpen})=>{setOpen(true);return true;}},{open:false,animate,peek});
+      h.handlers.command();const options=h.calls[0].options;
+      assert.equal(options.animate,animate);
+      assert.equal(options.transition?.duration,peek ? .12 : undefined);
+      assert.equal(options.transition?.type,peek?'tween':undefined);
+    }
+  });
+  test(`${variant.id}: changed, duplicate and already patched hooks fail closed`,()=>{
+    const source=variant.hook;
+    assert.throws(()=>patchSidebarCycle(source.replace('animate:t','animate:!1')),/reviewed native/);
+    assert.throws(()=>patchSidebarCycle(source+source),/exactly one/);
+    assert.throws(()=>patchSidebarCycle(patchSidebarCycle(source)),/already patched/);
+    assert.throws(()=>patchSidebarCycle(source.replace('`toggleSidebar`','`other`')),/registration/);
+    assert.throws(()=>patchSidebarCycle(source.replace('(8)','(9)')),/complete reviewed/);
+    assert.throws(()=>patchSidebarCycle(source.replace('r[3]=a','r[3]=null')),/complete reviewed/);
+    assert.throws(()=>patchSidebarCycle(source.replace('n===void 0||n','!!n')),/complete reviewed/);
+  });
+}
+test('mixed reviewed bindings and multiple variant hooks are rejected',()=>{
+  const [old,current]=SIDEBAR_VARIANTS;
+  assert.throws(()=>patchSidebarCycle(old.hook.replace(old.callback,current.callback)),/complete reviewed/);
+  assert.throws(()=>patchSidebarCycle(current.hook.replace(current.registration,old.registration)),/complete reviewed/);
+  assert.throws(()=>patchSidebarCycle(old.hook+current.hook),/exactly one/);
+  assert.throws(()=>patchSidebarCycle(old.hook+current.callback),/exactly one/);
+  assert.throws(()=>patchSidebarCycle(current.hook+old.registration),/exactly one/);
 });
-test('absent, missing, declining and throwing optional bridges retain native toggle',()=>{
-  for(const runtime of [undefined,{}, {cycleSidebar:()=>false},{cycleSidebar:()=>undefined},{cycleSidebar:()=>{throw Error('optional failure');}}]) {
-    const h=harness(runtime);
-    h.handlers.command();
-    assert.equal(h.state.open,false);
-    assert.equal(h.calls.length,1);
-    h.handlers.ipc();
-    assert.equal(h.state.open,true);
-    assert.equal(h.calls.length,2);
-  }
-});
-test('three-state runtime can consume opening and restore without double native toggle',()=>{
-  let hidden=false;
-  const h=harness({cycleSidebar:({open,setOpen})=>{
-    if(hidden){hidden=false;return true;}
-    if(!open){hidden=true;setOpen(true);return true;}
-    return false;
-  }});
-  h.handlers.command(); assert.equal(h.state.open,false);assert.equal(hidden,false);
-  h.handlers.ipc(); assert.equal(h.state.open,true);assert.equal(hidden,true);
-  h.handlers.command(); assert.equal(h.state.open,true);assert.equal(hidden,false);
-  assert.deepEqual(h.calls.map(x=>x.value),[false,true]);
-});
-test('disabled native commands never call optional code or native writer',()=>{
-  const h=harness({cycleSidebar:()=>assert.fail('disabled bridge called')},{enabled:false});
-  h.handlers.command();h.handlers.ipc();assert.equal(h.calls.length,0);
-});
-test('native animation and peek transition options are preserved by setOpen',()=>{
-  for(const animate of [true,false])for(const peek of [true,false]){
-    const h=harness({cycleSidebar:({setOpen})=>{setOpen(true);return true;}},{open:false,animate,peek});
-    h.handlers.command();const options=h.calls[0].options;
-    assert.equal(options.animate,animate);
-    assert.equal(options.transition?.duration,peek ? .12 : undefined);
-    assert.equal(options.transition?.type,peek?'tween':undefined);
-  }
-});
-test('changed, duplicate and already patched native hooks fail closed at build time',()=>{
-  const source=fixture();
-  assert.throws(()=>patchSidebarCycle(source.replace('animate:t','animate:!1')),/reviewed native/);
-  assert.throws(()=>patchSidebarCycle(source+source),/exactly one/);
-  assert.throws(()=>patchSidebarCycle(patchSidebarCycle(source)),/reviewed native|already patched/);
-  assert.throws(()=>patchSidebarCycle(source.replace('Pw(`toggleSidebar`,o)','Pw(`other`,o)')),/registration/);
+test('unknown minifier rename and reserved-name collisions are rejected',()=>{
+  assert.throws(()=>patchSidebarCycle(SIDEBAR_VARIANTS[1].hook.replace('qni(','unknown(')),/complete reviewed/);
+  assert.throws(()=>patchSidebarCycle(`${SIDEBAR_VARIANTS[1].hook};let __neonOpen;`),/reserved names/);
 });

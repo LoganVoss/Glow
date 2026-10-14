@@ -1,6 +1,6 @@
 # Install Glow
 
-Glow 0.10.5 builds and signs a local copy of your app, then replaces the app after you quit. Its border and controls live in **Settings → Appearance → Glow**. No Apple Developer membership, Apple-issued certificate, or signature from Glow's publisher is required.
+Glow 0.10.6 builds and signs a local copy of your app, then replaces the app after you quit. Its border and controls live in **Settings → Appearance → Glow**. No Apple Developer membership, Apple-issued certificate, or signature from Glow's publisher is required.
 
 This is an experimental local modification, not a notarized distribution. See [verification](verification.md) for what has actually been tested.
 
@@ -10,7 +10,7 @@ This is an experimental local modification, not a notarized distribution. See [v
 | --- | --- |
 | Mac | Apple silicon, macOS |
 | Installed app | `/Applications/ChatGPT.app`, bundle identifier `com.openai.codex` |
-| Reviewed sources | **26.1007.30912 (20156)** or **26.1007.21159 (20052)** |
+| Reviewed sources | **26.1007.71326 (20398)**, **26.1007.30912 (20156)**, or **26.1007.21159 (20052)** |
 | Build tools | Node.js **22.12+**, npm, Git, Python 3, and Apple's command-line tools |
 | Signing | Generated automatically on this Mac with explicit `--local-signing` |
 | Location | Checkout on the same filesystem as the app, with permission to replace it |
@@ -105,7 +105,7 @@ From the same checkout in Terminal:
 "$HOME/Glow/Restore Previous Codex.command"
 ```
 
-Follow its quit-and-wait instructions, then reopen. This restores the bundle installed immediately before the latest Glow installation; it may be an earlier Glow build. It does not erase saved preferences or your signing identity. A pristine vendor original is retained separately in `.local/originals/`. Keep recovery records even if a build fails.
+Follow its quit-and-wait instructions, then reopen. This restores the bundle installed immediately before the latest Glow installation; it may be an earlier Glow build. It does not erase saved preferences or your signing identity. A pristine vendor original is retained separately in `.local/originals/`. Keep recovery records even if a build fails. If you move the checkout, move its entire `.local/` folder with it; Restore recognizes the moved backup and verifies its original contents and signature before use.
 
 ## Optional Apple certificate mode
 

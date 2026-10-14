@@ -390,13 +390,54 @@ def safe_paths(replacement):
 
 
 def recovery_record():
+    if LATEST.is_symlink() or LATEST.resolve() != LATEST:
+        raise RuntimeError('Refusing a redirected recovery pointer.')
     pointer = json.loads(LATEST.read_text())
     build_id = pointer.get('buildId', '')
     if not valid_build_id(build_id):
         raise RuntimeError('Invalid recovery record identifier.')
     record_file = RECOVERY / build_id / 'record.json'
     real_directory(record_file.parent)
+    if record_file.is_symlink() or record_file.resolve() != record_file:
+        raise RuntimeError('Refusing a redirected recovery record.')
     return record_file, json.loads(record_file.read_text())
+
+
+def restore_bundle_paths(record_file, record):
+    """Recognize a moved checkout without following or rewriting journal paths.
+
+    Only a canonical pair from one historical .local root is relocatable. The
+    record's directory binds its build ID; actual bundles always come from this
+    checkout's fixed recovery/staging locations and still need full validation.
+    """
+    build_id = record.get('buildId')
+    if not valid_build_id(build_id) or record_file != RECOVERY / build_id / 'record.json':
+        raise RuntimeError('Recovery record identifier differs from its local directory.')
+    backup = record_file.parent / 'ChatGPT.app'
+    if (record.get('backupPath'), record.get('stagedPath')) != (str(backup), str(STAGED)):
+        def canonical_path(value):
+            if not isinstance(value, str):
+                raise RuntimeError('Recovery paths differ from the recorded local layout.')
+            path = Path(value)
+            if (not path.is_absolute() or path.parts[0] != '/' or str(path) != value
+                    or '..' in path.parts or '\0' in value):
+                raise RuntimeError('Recovery paths differ from the recorded local layout.')
+            return path
+        old_backup = canonical_path(record.get('backupPath'))
+        old_staged = canonical_path(record.get('stagedPath'))
+        if len(old_backup.parents) < 3:
+            raise RuntimeError('Recovery paths differ from the recorded local layout.')
+        old_local = old_backup.parents[2]
+        if (old_local.name != '.local'
+                or old_backup != old_local / 'recovery' / build_id / 'ChatGPT.app'
+                or old_staged != old_local / 'staging' / 'ChatGPT.app'):
+            raise RuntimeError('Recovery paths differ from the recorded local layout.')
+    # Check even absent candidates: a dangling symlink must not turn into a
+    # fallback to another bundle, and redirected parent directories are unsafe.
+    for path in (backup, STAGED):
+        if path.is_symlink() or path.resolve() != path:
+            raise RuntimeError('Refusing a redirected recovery bundle path.')
+    return backup, STAGED
 
 
 def valid_build_id(value):
@@ -470,20 +511,18 @@ def preflight(mode, allow_local_signing=False):
             raise RuntimeError('The latest recovery record does not contain an installed update to restore.')
         if record.get('target') != str(APP):
             raise RuntimeError('Recovery record does not target this installed app.')
-        expected_backup = record_file.parent / 'ChatGPT.app'
-        if record.get('backupPath') != str(expected_backup) or record.get('stagedPath') != str(STAGED):
-            raise RuntimeError('Recovery paths differ from the recorded local layout.')
+        expected_backup, staging = restore_bundle_paths(record_file, record)
         current = recovery_snapshot(APP)
         replacement = expected_backup
         if not replacement.is_dir():
-            replacement = STAGED
+            replacement = staging
         if record.get('state') == 'prepared' and not expected_backup.exists() and current['hashes'] == record['baseline']['hashes']:
             # A durable record is written before RENAME_SWAP. If the exact incoming
             # build is still staged, interruption happened before any app exchange.
-            incoming = snapshot(STAGED)
+            incoming = snapshot(staging)
             require_snapshot(incoming, record['replacement'], 'Unexchanged staged app')
             return {'noExchange': True, 'recordFile': record_file, 'record': record,
-                    'current': current, 'replacement': STAGED}
+                    'current': current, 'replacement': staging}
         safe_paths(replacement)
         incoming = snapshot(replacement)
         require_snapshot(incoming, record['baseline'], 'Previous app backup')
