@@ -4,8 +4,9 @@ import vm from 'node:vm';
 import { patchSidebarCycle, SIDEBAR_VARIANTS } from '../scripts/sidebar-cycle-patch.mjs';
 
 const bindings = {
-  '20052-20156': { hook: 'Qni', memo: '$ni', open: 'gC', peek: 'WH', writer: '$Rt', command: 'Pw' },
-  '20398': { hook: 'qni', memo: 'Jni', open: 'rC', peek: 'YH', writer: 'fzt', command: 'xw' },
+  '20052-20156': { hook: 'Qni', memo: '$ni', open: 'gC', peek: 'WH', writer: '$Rt', command: 'Pw', ipc: 'xs' },
+  '20398': { hook: 'qni', memo: 'Jni', open: 'rC', peek: 'YH', writer: 'fzt', command: 'xw', ipc: 'xs' },
+  '20586': { hook: 'EHa', memo: 'DHa', open: 'Hk', peek: 'FK', writer: 'vur', command: 'uj', ipc: 'go' },
 };
 function harness(variant, runtime, { open=true, enabled=true, peek=false, animate=true }={}) {
   const calls=[], handlers={}, state={open}, cache=Array(8).fill(Symbol('unset'));
@@ -15,7 +16,7 @@ function harness(variant, runtime, { open=true, enabled=true, peek=false, animat
     [names.memo]:{c:size=>{assert.equal(size,8);return cache;}},
     [names.open]:'open', [names.peek]:'peek',
     [names.command]:(name,handler)=>{assert.equal(name,'toggleSidebar');handlers.command=handler;},
-    xs:(name,handler)=>{assert.equal(name,'toggle-sidebar');handlers.ipc=handler;},
+    [names.ipc]:(name,handler)=>{assert.equal(name,'toggle-sidebar');handlers.ipc=handler;},
     [names.writer]:(scope,value,options)=>{state.open=value;calls.push({value,options});},
   });
   vm.runInContext(patchSidebarCycle(variant.hook),context);
@@ -82,14 +83,18 @@ for (const variant of SIDEBAR_VARIANTS) {
   });
 }
 test('mixed reviewed bindings and multiple variant hooks are rejected',()=>{
-  const [old,current]=SIDEBAR_VARIANTS;
-  assert.throws(()=>patchSidebarCycle(old.hook.replace(old.callback,current.callback)),/complete reviewed/);
-  assert.throws(()=>patchSidebarCycle(current.hook.replace(current.registration,old.registration)),/complete reviewed/);
-  assert.throws(()=>patchSidebarCycle(old.hook+current.hook),/exactly one/);
-  assert.throws(()=>patchSidebarCycle(old.hook+current.callback),/exactly one/);
-  assert.throws(()=>patchSidebarCycle(current.hook+old.registration),/exactly one/);
+  for(const original of SIDEBAR_VARIANTS)for(const other of SIDEBAR_VARIANTS){
+    if(original===other)continue;
+    assert.throws(()=>patchSidebarCycle(original.hook.replace(original.callback,other.callback)),/complete reviewed/);
+    assert.throws(()=>patchSidebarCycle(original.hook.replace(original.registration,other.registration)),/complete reviewed/);
+    assert.throws(()=>patchSidebarCycle(original.hook+other.hook),/exactly one/);
+    assert.throws(()=>patchSidebarCycle(original.hook+other.callback),/exactly one/);
+    assert.throws(()=>patchSidebarCycle(original.hook+other.registration),/exactly one/);
+  }
 });
 test('unknown minifier rename and reserved-name collisions are rejected',()=>{
-  assert.throws(()=>patchSidebarCycle(SIDEBAR_VARIANTS[1].hook.replace('qni(','unknown(')),/complete reviewed/);
-  assert.throws(()=>patchSidebarCycle(`${SIDEBAR_VARIANTS[1].hook};let __neonOpen;`),/reserved names/);
+  for(const variant of SIDEBAR_VARIANTS){
+    assert.throws(()=>patchSidebarCycle(variant.hook.replace(`${bindings[variant.id].hook}(`,'unknown(')),/complete reviewed/);
+    assert.throws(()=>patchSidebarCycle(`${variant.hook};let __neonOpen;`),/reserved names/);
+  }
 });

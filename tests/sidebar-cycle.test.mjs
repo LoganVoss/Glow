@@ -35,6 +35,9 @@ test('existing titlebar command cycles native chats, hidden icon rail, then norm
       if (url.pathname === '/preview/index.html' && url.searchParams.get('utility') === 'true') {
         bytes = Buffer.from(bytes.toString().replace('data-codex-window-type="electron"', 'data-codex-window-type="utility"'));
       }
+      if (url.pathname === '/preview/index.html' && url.searchParams.get('surface') === 'legacy') {
+        bytes = Buffer.from(bytes.toString().replace('_PageSurface_etoz9_2', '_PageSurface_yl8z4_2'));
+      }
       response.writeHead(200, { 'Content-Type': url.pathname.endsWith('.html') ? 'text/html' : url.pathname.endsWith('.js') ? 'text/javascript' : 'text/css' });
       response.end(bytes);
     } catch { response.writeHead(404); response.end(); }
@@ -46,13 +49,14 @@ test('existing titlebar command cycles native chats, hidden icon rail, then norm
   try {
     browser = await chromium.launch({ headless: true, chromiumSandbox: true,
       executablePath: process.env.NEON_TEST_BROWSER || (existsSync(chrome) ? chrome : undefined) });
-    async function fixture({ utility = false, ...options } = {}) {
+    async function fixture({ utility = false, legacySurface = false, ...options } = {}) {
       const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, ...options });
       await context.route('**/*', route => new URL(route.request().url()).origin === origin ? route.continue() : route.abort());
       const page = await context.newPage(), errors = [];
       page.setDefaultTimeout(4_000);
       page.on('pageerror', error => errors.push(error.message));
-      await page.goto(`${origin}/preview/index.html${utility ? '?utility=true' : ''}`);
+      const query = new URLSearchParams({ utility: String(utility), surface: legacySurface ? 'legacy' : 'latest' });
+      await page.goto(`${origin}/preview/index.html?${query}`);
       await page.waitForFunction(() => typeof window.__neonCodexRuntime?.cycleSidebar === 'function' && window.__neonPreviewSidebar);
       await page.getByRole('button', { name: 'Show workspace', exact: true }).click();
       await nextPaint(page);
@@ -296,40 +300,55 @@ test('existing titlebar command cycles native chats, hidden icon rail, then norm
       await f.close();
     });
 
-    await t.test('the same Glow border follows every sampled frame and preserves all rounded corners', async () => {
-      const f = await fixture(), { page } = f;
-      await page.evaluate(selector => { window.__originalBorder = document.querySelector(selector); }, BORDER);
-      const frames = await page.evaluate(async selector => {
-        const result = [], button = document.querySelector('#toggle-sidebar');
-        for (let click = 0; click < 3; click++) {
-          button.click();
-          const start = performance.now();
-          await new Promise(resolve => {
-            const sample = now => setTimeout(() => {
-              // ResizeObserver synchronizes Glow after RAF callbacks but before
-              // paint. Measure the completed rendering turn, not before that
-              // native geometry delivery.
-              const border = document.querySelector(selector), surface = document.querySelector('.page-surface');
-              const a = border.getBoundingClientRect(), b = surface.getBoundingClientRect();
-              const sa = getComputedStyle(border), sb = getComputedStyle(surface);
-              result.push({ click, same: border === window.__originalBorder, visible: sa.visibility,
-                error: Math.max(...['x', 'y', 'width', 'height'].map(key => Math.abs(a[key] - b[key]))),
-                radius: ['TopLeft', 'TopRight', 'BottomLeft', 'BottomRight'].map(corner => [parseFloat(sa[`border${corner}Radius`]), parseFloat(sb[`border${corner}Radius`])]) });
-              if (now - start < 560) requestAnimationFrame(sample); else resolve();
-            }, 0);
-            requestAnimationFrame(sample);
-          });
+    for (const legacySurface of [false, true]) {
+      await t.test(`the ${legacySurface ? 'legacy' : 'latest'} reviewed surface keeps border geometry and corners through every cycle frame`, async () => {
+        const f = await fixture({ legacySurface }), { page } = f;
+        assert.equal(await page.locator('.page-surface').evaluate(node => node.classList.contains('_PageSurface_etoz9_2')), !legacySurface);
+        await page.locator('.main').evaluate(node => {
+          // Lookalike route content is not a native background or geometry anchor.
+          const decoy = document.createElement('div'); decoy.id = 'nested-surface-decoy';
+          decoy.className = '_PageSurface_etoz9_2 _PageSurface_yl8z4_2'; decoy.hidden = true; node.append(decoy);
+        });
+        await page.evaluate(selector => { window.__originalBorder = document.querySelector(selector); }, BORDER);
+        const frames = await page.evaluate(async selector => {
+          const result = [], button = document.querySelector('#toggle-sidebar');
+          for (let click = 0; click < 3; click++) {
+            button.click();
+            const start = performance.now();
+            await new Promise(resolve => {
+              const sample = now => setTimeout(() => {
+                // ResizeObserver synchronizes Glow after RAF callbacks but before
+                // paint. Measure the completed rendering turn, not before that
+                // native geometry delivery.
+                const border = document.querySelector(selector), surface = document.querySelector('.page-surface');
+                const a = border.getBoundingClientRect(), b = surface.getBoundingClientRect();
+                const sa = getComputedStyle(border), sb = getComputedStyle(surface);
+                result.push({ click, surfaceX: b.x, same: border === window.__originalBorder, visible: sa.visibility,
+                  error: Math.max(...['x', 'y', 'width', 'height'].map(key => Math.abs(a[key] - b[key]))),
+                  radius: ['TopLeft', 'TopRight', 'BottomLeft', 'BottomRight'].map(corner => [parseFloat(sa[`border${corner}Radius`]), parseFloat(sb[`border${corner}Radius`])]) });
+                if (now - start < 560) requestAnimationFrame(sample); else resolve();
+              }, 0);
+              requestAnimationFrame(sample);
+            });
+          }
+          return result;
+        }, BORDER);
+        assert.ok(frames.length > 20, 'Sample animated geometry over multiple frames');
+        for (const click of [1, 2]) {
+          const positions = new Set(frames.filter(frame => frame.click === click).map(frame => Math.round(frame.surfaceX * 10)));
+          assert.ok(positions.size > 3, 'The actual native surface must travel smoothly through intermediate positions, not jump to its destination');
         }
-        return result;
-      }, BORDER);
-      assert.ok(frames.length > 20, 'Sample animated geometry over multiple frames');
-      for (const frame of frames) {
-        assert.equal(frame.same, true); assert.equal(frame.visible, 'visible');
-        assert.ok(frame.error < 1.1, `Glow must match the moving surface, including first frame: ${JSON.stringify(frame)}`);
-        for (const [a,b] of frame.radius) { assert.ok(a > 0); assert.ok(Math.abs(a-b) < .1); }
-      }
-      await f.close();
-    });
+        for (const frame of frames) {
+          assert.equal(frame.same, true); assert.equal(frame.visible, 'visible');
+          assert.ok(frame.error < 1.1, `Glow must match the moving surface, including first frame: ${JSON.stringify(frame)}`);
+          for (const [a,b] of frame.radius) { assert.ok(a > 0); assert.ok(Math.abs(a-b) < .1); }
+        }
+        assert.equal(await page.locator('.page-surface').getAttribute('data-neon-sidebar-geometry'), 'v1');
+        assert.equal(await page.locator('#nested-surface-decoy').getAttribute('data-neon-sidebar-geometry'), null,
+          'Only direct workspace surfaces are decorated, never similarly named route descendants');
+        await f.close();
+      });
+    }
 
     await t.test('reduced motion completes the cycle without a lingering geometry animation', async () => {
       const f = await fixture({ reducedMotion: 'reduce' }), { page } = f;

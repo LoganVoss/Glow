@@ -64,7 +64,7 @@
 [data-neon-sidebar-moving="true"] :is([data-neon-rail="v1"], [data-neon-rail-panel="v1"]) {
   transition: margin-inline-end var(--neon-sidebar-motion), var(--neon-theme-color-transition, background-color 0s);
 }
-[data-neon-sidebar-moving="true"] > [data-app-shell-workspace-row] > ._PageSurface_yl8z4_2 {
+[data-neon-sidebar-moving="true"] > [data-app-shell-workspace-row] > :is(._PageSurface_yl8z4_2, ._PageSurface_etoz9_2) {
   transition: inset-inline-start var(--neon-sidebar-motion), var(--neon-theme-color-transition, background-color 0s);
 }
 [data-neon-sidebar-moving="true"] [data-neon-rail-panel-clip="v1"] {

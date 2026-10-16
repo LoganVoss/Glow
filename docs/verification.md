@@ -1,5 +1,17 @@
 # Verification
 
+## 0.10.7 — App update compatibility, October 16, 2026
+
+The installed app **26.1013.31256 (20586)** was confirmed up to date through its configured updater. Its Appearance exports, native sidebar command bindings, and page-surface class changed. Each was reviewed against the actual OpenAI-signed archive and the preserved previous build before recording the new source pin. All four actual vendor sources (**20586**, **20398**, **20156**, **20052**) pass compatibility inspection.
+
+The builder and inspector now share one Appearance transformer with explicit reviewed binding variants. Both preserve the native component, callback-ref mount, and scoped non-optimistic theme writer; unknown, mixed, missing, or duplicate bindings are refused. The new sidebar variant preserves native fallback and introduces no startup imports. Glow tracks both reviewed surface classes with direct-child selectors, excluding nested lookalikes. The current preview uses the new class.
+
+Passed checks: **37** preference/runtime tests, **20** compatibility tests, **7** Appearance-transform tests, **20** sidebar-command tests, **24** Glow browser cases, **20** sidebar browser cases, **10** theme cases, and **4** early-window startup cases. Geometry coverage includes zoom, asymmetric corners, all three sidebar states, intermediate animated positions, and both reviewed surfaces. Installer, refresh, moved-checkout recovery, archive-preservation, and local-signing policy checks also passed. The package audit found no known dependency vulnerabilities, broken local documentation links, missing executable launchers, or tracked private artifacts. The README and compatibility guide now include the user's short repair prompt.
+
+Preparation returned **READY** for Glow **0.10.7** on build **20586**, reused the persistent local identity, verified all **109 code objects**, and passed installation preflight. All nine source hashes and five packaged JavaScript modules match the final source. Exactly nine packed renderer entries changed as allowed; expected unpacked signing/integrity changes are accounted for separately. The packaged Appearance and initial-renderer modules equal their exact reviewed transformations; the native settings bridge and general-settings modules are unchanged. CSP, Electron fuses, original packed payload, vendor original, and installed baseline passed preservation checks.
+
+All **three** isolated packaged-bootstrap cases passed: normal, deliberately failing, and missing Glow. The normal case imports the actual Settings and patched Appearance modules without dependency errors. The hosted app was not quit, replaced, or launched. These checks do not establish native sign-in, account integrations, or sustained performance; complete the [native smoke test](smoke-test.md) after installation.
+
 ## 0.10.6 — App update compatibility, October 14, 2026
 
 The installed app **26.1007.71326 (20398)** was confirmed up to date through its configured updater. The old compatibility check refused its renamed native sidebar command. Review of the actual OpenAI-signed archive confirmed the same callback behavior, disabled guard, memoization, and titlebar/menu/keyboard registration; the new bindings are now an explicit reviewed variant. The complete hook must match, and unknown, mixed, duplicate, or modified hooks are rejected. All three actual vendor sources (**20398**, **20156**, **20052**) pass the inspector. Removing the optional bridge restores each original renderer byte for byte; no native dependency on Glow is introduced.

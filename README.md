@@ -32,7 +32,7 @@ Glow also includes a sidebar toggle tweak. Once Glow is installed, you can use t
 
 ## Install with one prompt
 
-**No Apple Developer account or Apple signing certificate required.** Glow 0.10.6 creates a private signing identity on your Mac and reuses it when you refresh. It stays inside your normal app and its Appearance settings.
+**No Apple Developer account or Apple signing certificate required.** Glow 0.10.7 creates a private signing identity on your Mac and reuses it when you refresh. It stays inside your normal app and its Appearance settings.
 
 This is an experimental local modification, **not notarized**. It adds an app-scoped library-validation exception and removes vendor team-bound capabilities. Hardened runtime, Electron fuses, and Content Security Policy are preserved; system-wide protections and quarantine are unchanged. [Verification and remaining native checks →](docs/verification.md)
 
@@ -76,25 +76,19 @@ For the ChatGPT/Codex app you just installed with Glow, **choose Always Allow** 
 
 Glow uses a persistent local signature, so you need **no Apple Developer account**; code signing is still in place. Keeping that identity supports authorization across refreshes, although a lost or replaced identity, changed app behavior, or security policy can still require approval. [How Keychain continuity works →](docs/install.md#keychain-and-your-local-identity)
 
-The current reviewed sources are `/Applications/ChatGPT.app`, bundle ID `com.openai.codex`, versions **26.1007.71326 (20398)**, **26.1007.30912 (20156)**, and **26.1007.21159 (20052)** on Apple silicon. Build tools: Node.js 22.12+, Git, Python 3, and macOS command-line tools. [Manual setup and certificate-based mode →](docs/install.md)
+The current reviewed sources are `/Applications/ChatGPT.app`, bundle ID `com.openai.codex`, versions **26.1013.31256 (20586)**, **26.1007.71326 (20398)**, **26.1007.30912 (20156)**, and **26.1007.21159 (20052)** on Apple silicon. Build tools: Node.js 22.12+, Git, Python 3, and macOS command-line tools. [Manual setup and certificate-based mode →](docs/install.md)
 
 ## After an app update
 
-An app update may replace Glow. Keep your Glow checkout, `.local` backups, and local signing identity. Update a clean checkout with `git pull --ff-only` and `npm ci --ignore-scripts`, then prepare again:
+When a software update is released by OpenAI, Glow breaks. To fix it, use this prompt with ChatGPT:
 
-```sh
-"$HOME/Glow/Refresh Neon Codex.command" --local-signing --prepare-only
+```text
+Update Glow (Codex/ChatGPT Appearance Plugin) to work with the latest updated build of Codex/ChatGPT app. The most recent app update broke the plugin.
 ```
 
-Then run this in a separate Terminal window:
+Use a chat with file and Terminal access to your Mac, and point it at your existing Glow folder. It can review the new app version, adapt Glow, and prepare the update; then follow its Terminal instructions: **READY → ⌘Q → DONE → reopen**.
 
-```sh
-"$HOME/Glow/Refresh Neon Codex.command" --local-signing
-```
-
-Follow **READY → ⌘Q → DONE → reopen**. Refresh prepares against the current reviewed source and leaves saved Glow preferences in place. Refresh reuses the private identity on your Mac. No Apple certificate or fresh signature from Glow’s publisher is needed for each update.
-
-**A changed app can still need compatibility work.** Run `node scripts/compatibility.mjs` from your checkout to inspect its actual assets and integration points. A local assistant can use the [repair prompt](docs/compatibility.md#ask-chatgpt-to-help-after-an-update) to review and adapt a new version; you do not have to wait for a publisher-signed package. A structural candidate is not automatic approval. Glow does not disable the updater or promise uninterrupted glow through updates.
+Keep your Glow folder, `.local/` backups, and private signing identity. No Apple Developer account or new signature from Glow’s publisher is required. [Manual refresh instructions](docs/install.md#after-an-app-update) · [Compatibility guide](docs/compatibility.md)
 
 ## How it integrates
 

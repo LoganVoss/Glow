@@ -2,9 +2,9 @@
 
 Glow can inspect an updated app without a signing certificate. The check reads the installed app, finds its actual renderer assets, and checks whether Glow’s native Appearance integration still fits. It never patches, signs, installs, launches, or changes preferences.
 
-Glow 0.10.6 also checks the native Toggle Sidebar command and its exact shared titlebar/menu registration. Its optional callback falls back to native behavior when Glow is absent or fails. No Glow import is added to native startup, and the native Settings module remains unchanged. Review the rail, footer, panel geometry, and guarded Home destination when adapting a new build; hashes alone do not establish compatibility. Build **20398** uses an explicitly reviewed command variant alongside the existing **20052/20156** variant. The complete command, memoization, and both registrations must match; unknown or mixed bindings are refused.
+Glow 0.10.7 also checks the native Toggle Sidebar command and its exact shared titlebar/menu registration. Its optional callback falls back to native behavior when Glow is absent or fails. No Glow import is added to native startup, and the native Settings module remains unchanged. Review the rail, footer, panel geometry, and guarded Home destination when adapting a new build; hashes alone do not establish compatibility. Builds **20586**, **20398**, and **20052/20156** have explicit reviewed command variants. Build **20586** also has new Appearance bindings and a renamed native page surface. The complete command, memoization, both registrations, and Appearance bindings must match a reviewed variant; unknown or mixed bindings are refused.
 
-Glow 0.10.6 builds locally with a persistent identity it generates on your Mac. No Apple certificate or new publisher signature is required per update. Retain `~/Library/Application Support/Glow/Signing` and your checkout’s `.local/` recovery records.
+Glow 0.10.7 builds locally with a persistent identity it generates on your Mac. No Apple certificate or new publisher signature is required per update. Retain `~/Library/Application Support/Glow/Signing` and your checkout’s `.local/` recovery records.
 
 From the Glow repository, after `npm ci --ignore-scripts`:
 
@@ -34,36 +34,13 @@ Unknown versions are inspected rather than rejected solely for their version num
 
 ## Ask ChatGPT to help after an update
 
-A local assistant can review and adapt your checkout without waiting for Logan to sign a new package. This still requires evidence that the changed app fits the integration. Use Codex or ChatGPT with access to files and Terminal on your Mac, and paste this prompt with your repository path:
+Use ChatGPT or Codex with file and Terminal access to your Mac, and point it at your existing Glow folder:
 
 ```text
-Help me restore Glow after a Codex app update, using experimental --local-signing.
-My Glow repository is at [absolute repository path]. I understand this mode replaces
-the app signature and adds an app-scoped library-validation exception; it is not
-notarized and still needs native validation.
-
-Read AGENTS.md and the installation documentation. If the checkout predates 0.9.0,
-safely update it without overwriting my changes. No Apple-issued certificate is needed. Run scripts/compatibility.mjs against my current app. If
-Glow is installed, locate its matching preserved OpenAI-signed original and inspect
-that with --source.
-
-Use the reported asset paths, hashes, and integration checks to investigate. For a
-candidate, review the real native Appearance mount, settings writer, renderer entry,
-Electron integrity, and current builder transformation before proposing a precise
-compatibility change. Do not approve it by only changing a version or hash. If the
-structure changed, explain the failed check and repair it only when verifiable.
-
-After review and any justified changes, run appropriate source and packaging checks.
-Prepare with "./Refresh Neon Codex.command" --local-signing --prepare-only. Give me
-the exact absolute Refresh command with --local-signing for a separate persistent
-Terminal window. Explain READY → Command-Q → DONE → reopen, native checks still
-needed, and how to restore the previous app.
-
-Do not quit this host app or start a waiting installer from this chat. Do not claim
-native testing passed without testing it. Preserve originals, recovery data, settings,
-and ~/Library/Application Support/Glow/Signing. Do not rotate my local identity or
-change existing Keychain permissions. Explain remaining requirements honestly.
+Update Glow (Codex/ChatGPT Appearance Plugin) to work with the latest updated build of Codex/ChatGPT app. The most recent app update broke the plugin.
 ```
+
+The repository's `AGENTS.md` guides the assistant through inspecting the actual app, reviewing changed integration points, preserving your local identity and recovery files, and preparing a verified build. It must not approve compatibility by changing only a version or hash. Finish in a separate Terminal window: **READY → Command-Q → DONE → reopen**. No new publisher signature is required.
 
 ## What the check covers
 
@@ -73,4 +50,4 @@ change existing Keychain permissions. Explain remaining requirements honestly.
 - The required bridge exports and the native scoped, non-optimistic theme writer used for bidirectional light/dark switching.
 - Exact source-pin agreement for known builds and refusal of existing Glow assets, ambiguous discoveries, changed hooks, or a fallback mount on `document.body`.
 
-The transform strings deliberately match `scripts/build.mjs`; a regression check catches drift. The inspector additionally checks bridge bindings that the builder currently protects through reviewed file hashes. It does not execute the app or its JavaScript. Static checks cannot prove sign-in, updating, window transitions, or every runtime selector works on a new version. Those remain separate validation steps before declaring support.
+The inspector and builder share the same Appearance and sidebar transformers, so review checks and packaged changes cannot drift apart. Reviewed file hashes remain an additional build requirement. It does not execute the app or its JavaScript. Static checks cannot prove sign-in, updating, window transitions, or every runtime selector works on a new version. Those remain separate validation steps before declaring support.

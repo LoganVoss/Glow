@@ -4,6 +4,8 @@ export const SIDEBAR_SHELL = '[data-app-shell-frame][data-app-shell-page-surface
 export const SIDEBAR_STRUCTURE = '[data-app-navigation-rail],.app-shell-left-panel,.sidebar-navigation,#app-shell-sidebar,[data-app-shell-sidebar-trigger],[data-sidebar-destination="builtin:home"],.sidebar-item,[class~="@container/navigation-header"]';
 const HOME = '[data-sidebar-destination="builtin:home"]';
 const TRIGGER = '[data-app-shell-sidebar-trigger][aria-controls="app-shell-sidebar"]';
+// Only reviewed native workspace surfaces participate in the rail transition.
+const GEOMETRY = ':scope > [data-app-shell-workspace-row] > :is(._PageSurface_yl8z4_2, ._PageSurface_etoz9_2), [class~="group/panel-resizer"]';
 const px = number => `${Math.round(number * 1000) / 1000}px`;
 const MOTION_MS = 420;
 
@@ -153,7 +155,7 @@ export function createSidebarCycle(win, { onGeometryChange = () => {} } = {}) {
       attr(next.content, 'data-neon-rail-panel-content', 'v1');
       for (const icon of next.icons) attr(icon, 'data-neon-rail-icons', 'v1');
       for (const node of [next.rail, next.panel, next.clip, next.content,
-        ...next.shell.querySelectorAll('._PageSurface_yl8z4_2,[class~="group/panel-resizer"]')]) {
+        ...next.shell.querySelectorAll(GEOMETRY)]) {
         attr(node, 'data-neon-sidebar-geometry', 'v1');
       }
       style(next.shell, '--neon-rail-expanded-space', px(width));
@@ -178,7 +180,7 @@ export function createSidebarCycle(win, { onGeometryChange = () => {} } = {}) {
     current.icons = next.icons;
     for (const icon of current.icons) attr(icon, 'data-neon-rail-icons', 'v1');
     current.nativeHome = next.nativeHome; current.account = next.account;
-    for (const node of current.shell.querySelectorAll('._PageSurface_yl8z4_2,[class~="group/panel-resizer"]')) {
+    for (const node of current.shell.querySelectorAll(GEOMETRY)) {
       attr(node, 'data-neon-sidebar-geometry', 'v1');
     }
     // Some native destinations have only the rail, with no chat/settings list.

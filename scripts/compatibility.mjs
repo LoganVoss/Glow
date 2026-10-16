@@ -6,6 +6,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { patchSidebarCycle } from './sidebar-cycle-patch.mjs';
+import { patchAppearance } from './appearance-patch.mjs';
+export { APPEARANCE_NEEDLE } from './appearance-patch.mjs';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
@@ -13,10 +15,7 @@ const FRAMEWORK = 'Contents/Frameworks/Codex Framework.framework/Codex Framework
 const FUSE = '010011001';
 const FUSE_SENTINEL = Buffer.from('dL7pKGdnNz796PbbjQWNKmHXBZaB9tsX');
 const DIGEST_SENTINEL = Buffer.from('AGbevlPCksUGKNL8TSn7wGmJEuJsXb2A');
-export const APPEARANCE_NEEDLE = '(0,h.jsx)(u,{defaultAdvancedExpanded:i},r)';
-const REQUIRED_EXPORTS = ['Fan', 'H0t', 'p3t', 'wjt', 'Agn', 'PCn'];
 const count = (value, needle) => value.split(needle).length - 1;
-const escapeRE = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const LIMITS = [
   'Static inspection only: does not establish native launch, sign-in, updates, or full runtime compatibility.',
   'A candidate pin is a review proposal, not permission to bypass the builder or installer safeguards.',
@@ -27,10 +26,6 @@ function requireCheck(value, message) { if (!value) fail(message); }
 function one(values, label) { requireCheck(values.length === 1, `Expected exactly one ${label}; found ${values.length}`); return values[0]; }
 function imports(source) {
   return [...source.matchAll(/import\{([^}]+)\}from["'](\.\/[^"']+)["']/g)].map(match => ({ file: path.posix.normalize(`webview/assets/${match[2]}`), bindings: match[1] }));
-}
-function alias(bindings, exported) {
-  const match = bindings.match(new RegExp(`(?:^|,)${escapeRE(exported)} as ([A-Za-z_$][\\w$]*)(?:,|$)`));
-  return match?.[1];
 }
 function offsets(buffer, sentinel) {
   const result = [];
@@ -90,28 +85,11 @@ export function inspectStructure({ files, readFile, info, headerHash, frameworkB
     requireCheck(csp.length === 1, 'Expected exactly one Content-Security-Policy element');
     const patchedHTML = html.replace(firstModule[0], '    <script type="module" src="./assets/neon-codex.js"></script>\n' + firstModule[0]);
     requireCheck(patchedHTML !== html && (patchedHTML.match(/<meta\s+http-equiv="Content-Security-Policy"[^>]*>/g) || [])[0] === csp[0], 'Module insertion changed CSP');
-    requireCheck(count(appearance, APPEARANCE_NEEDLE) === 1, 'Expected exactly one native Appearance mount');
-    requireCheck(!appearance.includes('__neon') && !appearance.includes('__scope'), 'Reserved mount identifier already exists');
-    requireCheck(alias(bridgeImport.bindings, 'Agn') === 't' && alias(bridgeImport.bindings, 'PCn') === 'r', 'Appearance React/JSX imports changed');
-    requireCheck(alias(generalImport.bindings, 'n') === 'u', 'Appearance general settings component import changed');
-    requireCheck(count(appearance, 'm=r()') === 1 && count(appearance, 'h=t()') === 1, 'Appearance React/JSX initialization changed');
-    const replacement = '(0,h.jsxs)("div",{"data-neon-appearance":"v1",children:[(0,h.jsx)(u,{defaultAdvancedExpanded:i},r),(0,h.jsx)(__neonAppearanceSlot,{})]})';
-    const appearanceBoot = `import{startNeonCodex as __neonBoot}from"./neon-codex.js";import{Fan as __neonUseScope,H0t as __neonScope,p3t as __neonSettings,wjt as __neonWrite}from"./${path.posix.basename(bridgePath)}";function __neonAppearanceSlot(){const __scope=__neonUseScope(__neonScope),__setTheme=m.useCallback(__theme=>{if(__theme!=="light"&&__theme!=="dark")return Promise.reject(new Error("Unsupported appearance mode"));return __neonWrite(__scope,__neonSettings.theme,__theme,{optimistic:false})},[__scope]),__ref=m.useCallback(__slot=>{if(__slot)__neonBoot().mountAppearance(__slot,{setTheme:__setTheme})},[__setTheme]);return(0,h.jsx)("div",{"data-neon-settings-slot":"v1",ref:__ref})}`;
-    try { execFileSync(process.execPath, ['--input-type=module', '--check'], { input: appearanceBoot + appearance.replace(APPEARANCE_NEEDLE, replacement), encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }); }
+    const patchedAppearance = patchAppearance({ appearance, bridge, general, bridgePath, generalPath });
+    try { execFileSync(process.execPath, ['--input-type=module', '--check'], { input: patchedAppearance, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }); }
     catch { fail('Transformed Appearance module does not parse'); }
-    evidence('appearance-transform', 'Exact native mount, React bindings, entry module, unchanged CSP, and transformed module syntax');
-    for (const symbol of REQUIRED_EXPORTS) {
-      const exportBlocks = [...bridge.matchAll(/export\{([^}]+)\}/g)];
-      requireCheck(exportBlocks.some(block => new RegExp(`(?:^|,)[A-Za-z_$][\\w$]* as ${symbol}(?:,|$)`).test(block[1])), `Required settings bridge export missing: ${symbol}`);
-    }
-    const nativeImport = one(imports(general).filter(item => item.file === bridgePath), 'general settings bridge import');
-    const local = Object.fromEntries(['Fan', 'H0t', 'p3t', 'wjt'].map(symbol => [symbol, alias(nativeImport.bindings, symbol)]));
-    requireCheck(Object.values(local).every(Boolean), 'Native appearance writer imports changed');
-    const writer = new RegExp(`${escapeRE(local.wjt)}\\(([A-Za-z_$][\\w$]*),${escapeRE(local.p3t)}\\.theme,([A-Za-z_$][\\w$]*),\\{optimistic:!1\\}\\)`);
-    const writerMatch = general.match(writer);
-    requireCheck(writerMatch, 'Native non-optimistic appearance writer changed');
-    requireCheck(general.includes(`${writerMatch[1]}=${local.Fan}(${local.H0t})`), 'Native appearance scope binding changed');
-    evidence('settings-bridge', 'Required exports and native scoped non-optimistic theme writer are present');
+    evidence('appearance-transform', 'Reviewed native mount and React/JSX bindings, unchanged CSP, and transformed module syntax');
+    evidence('settings-bridge', 'Reviewed exports and the native scoped non-optimistic theme writer are present');
     const patchedInitial = patchSidebarCycle(initial);
     try { execFileSync(process.execPath, ['--input-type=module', '--check'], { input: patchedInitial, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }); }
     catch { fail('Transformed native sidebar command does not parse'); }

@@ -812,57 +812,70 @@ test('Glow: balanced color controls, fluid palettes, and native lifecycle', { ti
       assert.equal(saved.profiles.dark.gloss, .67);
     });
 
-    await t.test('native surface geometry follows shell zoom and ignores utility surfaces', async () => {
-      const geometryPage = await context.newPage();
-      try {
-        await geometryPage.goto(`${origin}/preview/index.html`);
-        await geometryPage.evaluate(() => window.__neonCodexRuntime?.destroy());
-        const css = await readFile(path.join(ROOT, 'src/glow.css'), 'utf8');
-        await geometryPage.setContent(`<html data-codex-window-type="electron"><head><style>${css}body{margin:0}</style></head><body></body></html>`);
-        const result = await geometryPage.evaluate(async () => {
-          const { createGlowLayer } = await import('/src/glow-layer.js');
-          const makeOverlay = () => {
-            const node = document.createElement('div'); node.dataset.neonCodexFrame = '';
-            node.innerHTML = '<div class="neon-glow-blur"><div class="neon-glow-color"></div></div><div class="neon-glow-edge"></div><div class="neon-glow-depth"></div>';
-            return node;
-          };
-          const options = { makeOverlay, applyOverlay(node) { node.dataset.pattern = 'prism'; node.dataset.enabled = 'true'; }, getTheme: () => 'light' };
-          const layer = createGlowLayer(window, options), emptyUtility = layer.getFrame() === null;
-          const shell = document.createElement('div');
-          shell.dataset.appShellFrame = ''; shell.dataset.appShellPageSurface = 'true';
-          // Matches the reviewed native scope: zoom belongs to the shell, not body.
-          shell.style.cssText = 'position:absolute;left:32px;top:40px;width:640px;height:400px;zoom:1.25';
-          shell.innerHTML = '<div data-app-shell-workspace-row style="position:relative;width:100%;height:100%"><div class="_PageSurface_yl8z4_2" style="position:absolute;inset:44px 0 0 48px;border-radius:16px"></div></div>';
-          document.body.append(shell); layer.reconcile();
-          const frame = layer.getFrame(), surface = shell.querySelector('._PageSurface_yl8z4_2');
-          const rect = node => { const r = node.getBoundingClientRect(); return [r.left, r.top, r.width, r.height]; };
-          const expected = rect(surface), actual = rect(frame), radius = getComputedStyle(frame).borderTopLeftRadius;
-          const animation = frame.getAnimations().find(a => a.animationName === 'neon-glow-orbit');
-          const twoFrames = () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-          await twoFrames(); const before = animation.currentTime;
-          shell.remove(); layer.reconcile(); await twoFrames();
-          const gap = { same: layer.getFrame() === frame, animation: frame.getAnimations().includes(animation),
-            bounds: rect(frame), visibility: getComputedStyle(frame).visibility, elapsed: animation.currentTime - before };
-          document.body.append(shell); layer.reconcile();
-          document.documentElement.dataset.codexWindowType = 'browser'; layer.reconcile();
-          const browserHidden = getComputedStyle(frame).visibility === 'hidden';
-          layer.destroy(); shell.remove();
-          document.documentElement.dataset.codexWindowType = 'electron';
-          const dialog = document.createElement('div'); dialog.setAttribute('role', 'dialog'); dialog.append(shell); document.body.append(dialog);
-          const utility = createGlowLayer(window, options), dialogIgnored = utility.getFrame() === null;
-          utility.destroy(); dialog.remove();
-          return { expected, actual, radius, gap, emptyUtility, browserHidden, dialogIgnored,
-            remaining: document.querySelectorAll('[data-neon-global="true"]').length };
-        });
-        assert.deepEqual(result.actual, result.expected);
-        assert.equal(result.radius, '20px');
-        assert.deepEqual(result.gap.bounds, result.expected);
-        assert.ok(result.gap.same && result.gap.animation && result.gap.elapsed > 0);
-        assert.equal(result.gap.visibility, 'visible');
-        assert.ok(result.emptyUtility && result.browserHidden && result.dialogIgnored);
-        assert.equal(result.remaining, 0);
-      } finally { await geometryPage.close(); }
-    });
+    for (const surfaceClass of ['_PageSurface_etoz9_2', '_PageSurface_yl8z4_2']) {
+      await t.test(`reviewed surface ${surfaceClass} follows native zoom/corners and ignores nested or unknown surfaces`, async () => {
+        const geometryPage = await context.newPage();
+        try {
+          await geometryPage.goto(`${origin}/preview/index.html`);
+          await geometryPage.evaluate(() => window.__neonCodexRuntime?.destroy());
+          const css = await readFile(path.join(ROOT, 'src/glow.css'), 'utf8');
+          await geometryPage.setContent(`<html data-codex-window-type="electron"><head><style>${css}body{margin:0}</style></head><body></body></html>`);
+          const result = await geometryPage.evaluate(async surfaceClass => {
+            const { createGlowLayer } = await import('/src/glow-layer.js');
+            const makeOverlay = () => {
+              const node = document.createElement('div'); node.dataset.neonCodexFrame = '';
+              node.innerHTML = '<div class="neon-glow-blur"><div class="neon-glow-color"></div></div><div class="neon-glow-edge"></div><div class="neon-glow-depth"></div>';
+              return node;
+            };
+            const options = { makeOverlay, applyOverlay(node) { node.dataset.pattern = 'prism'; node.dataset.enabled = 'true'; }, getTheme: () => 'light' };
+            const layer = createGlowLayer(window, options), emptyUtility = layer.getFrame() === null;
+            const shell = document.createElement('div');
+            shell.dataset.appShellFrame = ''; shell.dataset.appShellPageSurface = 'true';
+            // Matches the reviewed native scope: zoom belongs to the shell, not body.
+            shell.style.cssText = 'position:absolute;left:32px;top:40px;width:640px;height:400px;zoom:1.25;--app-shell-titlebar-height:44px;--app-shell-navigation-rail-width:48px;--app-shell-window-radius:12px';
+            shell.innerHTML = `<div data-app-shell-workspace-row style="position:relative;width:100%;height:100%">
+              <div><div class="${surfaceClass}" style="width:40px;height:40px;border-radius:2px"></div></div>
+              <div class="_PageSurface_unreviewed_2" style="position:absolute;inset:0;border-radius:1px"></div>
+              <div data-reviewed-surface class="${surfaceClass}" style="position:absolute;inset:46px 5px 7px 51px;border-radius:16px 18px 22px 24px"></div>
+            </div>`;
+            document.body.append(shell); layer.reconcile();
+            const frame = layer.getFrame(), surface = shell.querySelector('[data-reviewed-surface]');
+            const rect = node => { const r = node.getBoundingClientRect(); return [r.left, r.top, r.width, r.height]; };
+            const expected = rect(surface), actual = rect(frame);
+            const radii = ['TopLeft', 'TopRight', 'BottomRight', 'BottomLeft'].map(corner => getComputedStyle(frame)[`border${corner}Radius`]);
+            const row = surface.parentElement; surface.remove(); layer.reconcile();
+            const bounds = row.getBoundingClientRect();
+            const fallback = { actual: rect(frame), expected: [bounds.left + 60, bounds.top + 55, bounds.width - 60, bounds.height - 55], radius: getComputedStyle(frame).borderTopLeftRadius };
+            row.append(surface); layer.reconcile();
+            const animation = frame.getAnimations().find(a => a.animationName === 'neon-glow-orbit');
+            const twoFrames = () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+            await twoFrames(); const before = animation.currentTime;
+            shell.remove(); layer.reconcile(); await twoFrames();
+            const gap = { same: layer.getFrame() === frame, animation: frame.getAnimations().includes(animation),
+              bounds: rect(frame), visibility: getComputedStyle(frame).visibility, elapsed: animation.currentTime - before };
+            document.body.append(shell); layer.reconcile();
+            document.documentElement.dataset.codexWindowType = 'browser'; layer.reconcile();
+            const browserHidden = getComputedStyle(frame).visibility === 'hidden';
+            layer.destroy(); shell.remove();
+            document.documentElement.dataset.codexWindowType = 'electron';
+            const dialog = document.createElement('div'); dialog.setAttribute('role', 'dialog'); dialog.append(shell); document.body.append(dialog);
+            const utility = createGlowLayer(window, options), dialogIgnored = utility.getFrame() === null;
+            utility.destroy(); dialog.remove();
+            return { expected, actual, radii, fallback, gap, emptyUtility, browserHidden, dialogIgnored,
+              remaining: document.querySelectorAll('[data-neon-global="true"]').length };
+          }, surfaceClass);
+          assert.deepEqual(result.actual, result.expected);
+          assert.deepEqual(result.radii, ['20px', '22.5px', '27.5px', '30px']);
+          assert.deepEqual(result.fallback.actual, result.fallback.expected, 'Only direct, reviewed surfaces may establish the border geometry');
+          assert.equal(result.fallback.radius, '15px');
+          assert.deepEqual(result.gap.bounds, result.expected);
+          assert.ok(result.gap.same && result.gap.animation && result.gap.elapsed > 0);
+          assert.equal(result.gap.visibility, 'visible');
+          assert.ok(result.emptyUtility && result.browserHidden && result.dialogIgnored);
+          assert.equal(result.remaining, 0);
+        } finally { await geometryPage.close(); }
+      });
+    }
 
     await t.test('cross-window preferences and storage reset synchronize; narrow cards fit', async () => {
       const second = await context.newPage(); await second.goto(`${origin}/preview/index.html`);

@@ -15,6 +15,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import assert from 'node:assert/strict';
 import { withLocalIdentity } from './local-identity.mjs';
 import { patchSidebarCycle } from './sidebar-cycle-patch.mjs';
+import { patchAppearance } from './appearance-patch.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.dirname(HERE);
@@ -279,17 +280,14 @@ function patchAssets(asar, archive, originalCSS) {
   const patchedHTML = html.replace(firstModule[0], scriptTag + firstModule[0]);
   assert.notEqual(patchedHTML, html, 'Could not insert the settings module');
   assert.equal(cspMeta(patchedHTML), cspMeta(html), 'Content Security Policy changed');
-  const needle = '(0,h.jsx)(u,{defaultAdvancedExpanded:i},r)';
-  const replacement = '(0,h.jsxs)("div",{"data-neon-appearance":"v1",children:[(0,h.jsx)(u,{defaultAdvancedExpanded:i},r),(0,h.jsx)(__neonAppearanceSlot,{})]})';
-  const appearance = originalAppearance.toString();
-  assert.equal(appearance.split(needle).length - 1, 1, 'Expected exactly one native Appearance mount');
-  assert.ok(!appearance.includes('__neon') && !appearance.includes('__scope'), 'Reserved mount identifier already exists');
-  // Static dependency plus a stable React commit ref guarantees ready controls
-  // before paint, including the first lazy-loaded Appearance visit.
-  // The same scoped, non-optimistic writer used by the native appearance control.
-  // Keep hooks in a React component and the prepared panel in its stable ref.
-  const appearanceBoot = `import{startNeonCodex as __neonBoot}from"./neon-codex.js";import{Fan as __neonUseScope,H0t as __neonScope,p3t as __neonSettings,wjt as __neonWrite}from"./${path.posix.basename(PIN.settingsBridge)}";function __neonAppearanceSlot(){const __scope=__neonUseScope(__neonScope),__setTheme=m.useCallback(__theme=>{if(__theme!=="light"&&__theme!=="dark")return Promise.reject(new Error("Unsupported appearance mode"));return __neonWrite(__scope,__neonSettings.theme,__theme,{optimistic:false})},[__scope]),__ref=m.useCallback(__slot=>{if(__slot)__neonBoot().mountAppearance(__slot,{setTheme:__setTheme})},[__setTheme]);return(0,h.jsx)("div",{"data-neon-settings-slot":"v1",ref:__ref})}`;
-  const patchedAppearance = appearanceBoot + appearance.replace(needle, replacement);
+  // The shared transformer validates the reviewed native bindings and uses the
+  // same scoped, non-optimistic theme writer as the app's Appearance controls.
+  const patchedAppearance = patchAppearance({
+    appearance: originalAppearance.toString(),
+    bridge: asar.extractFile(archive, PIN.settingsBridge).toString(),
+    general: asar.extractFile(archive, PIN.generalSettings).toString(),
+    bridgePath: PIN.settingsBridge, generalPath: PIN.generalSettings,
+  });
   run(process.execPath, ['--input-type=module', '--check'], { input: patchedAppearance });
   const patchedInitial = patchSidebarCycle(originalInitial.toString());
   run(process.execPath, ['--input-type=module', '--check'], { input: patchedInitial });

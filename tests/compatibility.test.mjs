@@ -4,15 +4,16 @@ import fs from 'node:fs';
 import { createHash } from 'node:crypto';
 import { inspectStructure, APPEARANCE_NEEDLE } from '../scripts/compatibility.mjs';
 import { SIDEBAR_VARIANTS } from '../scripts/sidebar-cycle-patch.mjs';
+import { APPEARANCE_VARIANTS } from '../scripts/appearance-patch.mjs';
 
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
-function fixture(variant = SIDEBAR_VARIANTS[0]) {
+function fixture(variant = SIDEBAR_VARIANTS[0], appearance = APPEARANCE_VARIANTS[0]) {
   const assets = new Map(Object.entries({
     'webview/index.html': '<head><meta http-equiv="Content-Security-Policy" content="default-src \'self\'">\n<link href="./assets/app-shared-a1.css">\n<script type="module" src="./assets/entry-a1.js"></script>\n</head><body></body>',
     'webview/assets/app-shared-a1.css': ':root{color:black}',
-    'webview/assets/appearance-settings-a1.js': `import{Agn as t,PCn as r}from"./app-shared-a1.js";import{n as u}from"./general-settings-a1.js";var m,h;m=r();h=t();function f(){const i=true;return ${APPEARANCE_NEEDLE}}`,
-    'webview/assets/app-shared-a1.js': 'export{a as Fan,b as H0t,c as p3t,d as wjt,e as Agn,f as PCn};',
-    'webview/assets/general-settings-a1.js': 'import{Fan as N,H0t as P,p3t as Xt,wjt as V}from"./app-shared-a1.js";function theme(){let t=N(P);return e=>V(t,Xt.theme,e,{optimistic:!1})}',
+    'webview/assets/appearance-settings-a1.js': `import{${appearance.jsx} as ${appearance.jsxAlias},${appearance.cache} as ${appearance.cacheAlias},${appearance.react} as r}from"./app-shared-a1.js";import{n as u}from"./general-settings-a1.js";var m,h,p;m=r();h=${appearance.jsxAlias}();p=${appearance.cacheAlias}();function f(){const i=true;return ${APPEARANCE_NEEDLE}}`,
+    'webview/assets/app-shared-a1.js': `export{a as ${appearance.scopeHook},b as ${appearance.scope},c as ${appearance.settings},d as ${appearance.write},e as ${appearance.jsx},f as ${appearance.react},g as ${appearance.cache}};`,
+    'webview/assets/general-settings-a1.js': `import{${appearance.scopeHook} as N,${appearance.scope} as P,${appearance.settings} as Xt,${appearance.write} as V}from"./app-shared-a1.js";function theme(){let t=N(P);return e=>V(t,Xt.theme,e,{optimistic:!1})}`,
     'webview/assets/entry-a1.js': 'import "./app-initial-a1.js";',
     'webview/assets/app-initial-a1.js': variant.hook,
   }));
@@ -103,19 +104,19 @@ test('body mount fallback is never accepted', () => {
 });
 test('duplicate mount anchors and reserved names are refused', () => {
   let f = fixture();change(f, 'appearance-settings', APPEARANCE_NEEDLE, `${APPEARANCE_NEEDLE},${APPEARANCE_NEEDLE}`);reject(f, /exactly one native Appearance mount/);
-  f = fixture();change(f, 'appearance-settings', 'var m,h;', 'var m,h,__scope;');reject(f, /Reserved mount identifier/);
+  f = fixture();change(f, 'appearance-settings', 'var m,h,p;', 'var m,h,p,__scope;');reject(f, /Reserved mount identifier/);
 });
 test('missing entry module or duplicate CSP is refused', () => {
   let f = fixture();change(f, 'index.html', 'type="module"', 'type="text/javascript"');reject(f, /native entry module/);
   f = fixture();change(f, 'index.html', '</head>', '<meta http-equiv="Content-Security-Policy" content="none"></head>');reject(f, /exactly one Content-Security-Policy/);
 });
 test('missing bridge export or changed native writer semantics is refused', () => {
-  let f = fixture();change(f, 'app-shared-a1.js', 'd as wjt', 'd as other');reject(f, /bridge export missing: wjt/);
-  f = fixture();change(f, 'general-settings', 'optimistic:!1', 'optimistic:!0');reject(f, /non-optimistic appearance writer changed/);
+  let f = fixture();change(f, 'app-shared-a1.js', 'd as wjt', 'd as other');reject(f, /bridge export missing or duplicated: wjt/);
+  f = fixture();change(f, 'general-settings', 'optimistic:!1', 'optimistic:!0');reject(f, /native non-optimistic appearance writer/);
   f = fixture();change(f, 'general-settings', 't=N(P)', 't=N(other)');reject(f, /scope binding changed/);
 });
 test('changed React bindings or malformed transform is refused', () => {
-  let f = fixture();change(f, 'appearance-settings', 'm=r()', 'm=other()');reject(f, /React\/JSX initialization changed/);
+  let f = fixture();change(f, 'appearance-settings', 'm=r()', 'm=other()');reject(f, /React\/JSX\/cache initialization changed/);
   f = fixture();change(f, 'appearance-settings', 'function f(){', 'function f(){{');reject(f, /does not parse/);
 });
 test('already-patched archive cannot become a candidate', () => {
@@ -131,12 +132,19 @@ test('unrelated application and duplicate archive paths are refused', () => {
   let f=fixture();f.info.CFBundleIdentifier='org.other';reject(f,/not the Codex/);
   f=fixture();const result=inspectStructure({...f,files:[...f.assets.keys(),'webview/index.html'],readFile: file=>Buffer.from(f.assets.get(file))});assert.match(result.reason,/Duplicate archive paths/);
 });
-test('inspector transform strings track current builder insertion rather than inventing a mount', () => {
-  const builder=fs.readFileSync(new URL('../scripts/build.mjs',import.meta.url),'utf8');
-  const inspector=fs.readFileSync(new URL('../scripts/compatibility.mjs',import.meta.url),'utf8');
-  assert.ok(builder.includes(`const needle = '${APPEARANCE_NEEDLE}'`));
-  const builderReplacement=builder.match(/const replacement = ('[^\n]+');/)[1];
-  assert.ok(inspector.includes(`const replacement = ${builderReplacement};`));
-  const builderBoot=builder.match(/const appearanceBoot = (`[^\n]+`);/)[1].replace('PIN.settingsBridge','bridgePath');
-  assert.ok(inspector.includes(`const appearanceBoot = ${builderBoot};`));
+test('builder and inspector both use the same reviewed Appearance transformer', () => {
+  for (const file of ['build.mjs','compatibility.mjs']) {
+    const source=fs.readFileSync(new URL(`../scripts/${file}`,import.meta.url),'utf8');
+    assert.ok(source.includes("import { patchAppearance } from './appearance-patch.mjs';"));
+    assert.ok(source.includes('const patchedAppearance = patchAppearance({'));
+    assert.equal(source.includes('function __neonAppearanceSlot'),false);
+  }
+});
+test('latest Appearance bindings require matching bridge and native writer before a pin proposal', () => {
+  const f=fixture(SIDEBAR_VARIANTS.at(-1),APPEARANCE_VARIANTS.at(-1));
+  const result=inspect(f);
+  assert.equal(result.status,'compatible-candidate',result.reason);
+  assert.equal(inspect(f,{[result.candidateSourcePin.key]:result.candidateSourcePin.value}).status,'compatible-known');
+  change(f,'general-settings','optimistic:!1','optimistic:!0');
+  reject(f,/native non-optimistic appearance writer/);
 });

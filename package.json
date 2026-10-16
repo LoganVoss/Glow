@@ -1,6 +1,6 @@
 {
   "name": "neon-codex-local-theme",
-  "version": "0.10.6",
+  "version": "0.10.7",
   "private": true,
   "type": "module",
   "description": "Unofficial local macOS appearance patch for Codex with persistent local signing; no Apple Developer certificate required.",
@@ -30,7 +30,8 @@
     "test:keychain": "node --test tests/keychain-continuity.test.mjs",
     "test:startup": "node --test tests/renderer-startup.test.mjs tests/native-bootstrap.test.mjs",
     "test:sidebar": "node --test tests/sidebar-cycle.test.mjs tests/sidebar-cycle-patch.test.mjs",
-    "test:theme": "node --test tests/theme-transition.test.mjs"
+    "test:theme": "node --test tests/theme-transition.test.mjs",
+    "test:appearance": "node --test tests/appearance-patch.test.mjs"
   },
   "dependencies": {
     "@electron/asar": "4.1.0"

@@ -1,6 +1,6 @@
 # Install Glow
 
-Glow 0.10.6 builds and signs a local copy of your app, then replaces the app after you quit. Its border and controls live in **Settings → Appearance → Glow**. No Apple Developer membership, Apple-issued certificate, or signature from Glow's publisher is required.
+Glow 0.10.7 builds and signs a local copy of your app, then replaces the app after you quit. Its border and controls live in **Settings → Appearance → Glow**. No Apple Developer membership, Apple-issued certificate, or signature from Glow's publisher is required.
 
 This is an experimental local modification, not a notarized distribution. See [verification](verification.md) for what has actually been tested.
 
@@ -10,7 +10,7 @@ This is an experimental local modification, not a notarized distribution. See [v
 | --- | --- |
 | Mac | Apple silicon, macOS |
 | Installed app | `/Applications/ChatGPT.app`, bundle identifier `com.openai.codex` |
-| Reviewed sources | **26.1007.71326 (20398)**, **26.1007.30912 (20156)**, or **26.1007.21159 (20052)** |
+| Reviewed sources | **26.1013.31256 (20586)**, **26.1007.71326 (20398)**, **26.1007.30912 (20156)**, or **26.1007.21159 (20052)** |
 | Build tools | Node.js **22.12+**, npm, Git, Python 3, and Apple's command-line tools |
 | Signing | Generated automatically on this Mac with explicit `--local-signing` |
 | Location | Checkout on the same filesystem as the app, with permission to replace it |
@@ -95,7 +95,7 @@ Prepare again:
 
 Then finish in Terminal with the same command without `--prepare-only`, following **READY → Command-Q → DONE → reopen**. Refresh preserves Glow preferences, reuses your local identity, and does not downgrade the app or alter its updater.
 
-If the version is unreviewed, use the [compatibility check and copyable repair prompt](compatibility.md). Your local assistant can inspect and adapt the integration without waiting for a publisher-signed package. A structural candidate still requires review and validation. An app update that arrives during installation is rechecked before any swap.
+For help with any app update, use the [short repair prompt in the README](../README.md#after-an-app-update). If the version is unreviewed, follow the [compatibility review](compatibility.md). Your local assistant can inspect and adapt the integration without waiting for a publisher-signed package. A structural candidate still requires review and validation. An app update that arrives during installation is rechecked before any swap.
 
 ## Restore
 
