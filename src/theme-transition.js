@@ -18,7 +18,6 @@ export function createThemeTransition(win = window) {
   const colorMedia = win.matchMedia('(prefers-color-scheme: dark)');
   const motionMedia = win.matchMedia('(prefers-reduced-motion: reduce)');
   const surfaces = new Map(), pendingRoots = new Set([doc]);
-  let prune = false;
   let destroyed = false, armed = false, frame = null, timer = null;
   const originalActive = root.getAttribute(ACTIVE);
 
@@ -48,20 +47,31 @@ export function createThemeTransition(win = window) {
     if (previous.value) node.style.setProperty(BASE, previous.value, previous.priority);
     else node.style.removeProperty(BASE);
   }
+  function releaseRemoved(subtree) {
+    // Mutation delivery still runs when background windows suspend RAF. Release
+    // detached controls here rather than retaining them until the next paint,
+    // and inspect only the removed subtree, never every control in a long chat.
+    // A native reparent within this delivery keeps its prepared transition.
+    if (subtree.isConnected) return;
+    const walker = doc.createTreeWalker(subtree, win.NodeFilter.SHOW_ELEMENT);
+    let node = subtree;
+    do {
+      pendingRoots.delete(node);
+      const previous = surfaces.get(node);
+      if (previous) { restore(node, previous); surfaces.delete(node); }
+    } while ((node = walker.nextNode()));
+  }
   function collect() {
     frame = null;
     if (destroyed || armed) return;
-    if (prune) {
-      for (const [node, previous] of surfaces) {
-        if (!node.isConnected) { restore(node, previous); surfaces.delete(node); }
-      }
-      prune = false;
-    }
     // Only inspect newly added element subtrees after the initial pass. Streamed
     // text tokens never enqueue work or rescan an existing conversation.
     const candidates = new Set();
     for (const subtree of pendingRoots) {
       if (subtree !== doc && !subtree.isConnected) continue;
+      let ancestor = subtree.parentNode;
+      while (ancestor && !pendingRoots.has(ancestor)) ancestor = ancestor.parentNode;
+      if (ancestor) continue;
       if (subtree.matches?.(SURFACES)) candidates.add(subtree);
       if (subtree === doc || subtree.childElementCount) {
         for (const node of subtree.querySelectorAll(SURFACES)) candidates.add(node);
@@ -79,7 +89,7 @@ export function createThemeTransition(win = window) {
     });
   }
   function scheduleCollect() {
-    if (!destroyed && !armed && frame === null && (pendingRoots.size || prune)) frame = win.requestAnimationFrame(collect);
+    if (!destroyed && !armed && frame === null && pendingRoots.size) frame = win.requestAnimationFrame(collect);
   }
   function cancelColors() {
     // Removing a transition declaration alone does not cancel a transition
@@ -116,8 +126,8 @@ export function createThemeTransition(win = window) {
   const themeObserver = new win.MutationObserver(update);
   const structureObserver = new win.MutationObserver(records => {
     for (const record of records) {
-      for (const node of record.addedNodes) if (node.nodeType === 1) pendingRoots.add(node);
-      if (!prune && [...record.removedNodes].some(node => node.nodeType === 1)) prune = true;
+      for (const node of record.removedNodes) if (node.nodeType === 1) releaseRemoved(node);
+      for (const node of record.addedNodes) if (node.nodeType === 1 && node.isConnected) pendingRoots.add(node);
     }
     scheduleCollect();
   });

@@ -1,24 +1,19 @@
-# Glow 0.10.7 — App update compatibility
+# Glow 0.10.8 — Less work, same glow
 
-Updated for **Codex/ChatGPT 26.1013.31256 (20586)**. Created by **Logan Voss + Astra 6 Ultra**.
+Memory and idle-rendering fixes for **Codex/ChatGPT**, preserving Glow’s colors, motion, and Appearance controls. Created by **Logan Voss + Astra 6 Ultra**.
 
-This release repairs the updated app’s Appearance integration, border alignment, and sidebar toggle. Earlier reviewed builds remain supported. Your saved looks and persistent local signing identity are preserved.
+- Release detached sidebar controls and route surfaces during navigation.
+- Clean up removed theme surfaces without rescanning the conversation or waiting for a visible window.
+- Stop invisible border animations after the dissolve; suspend offscreen previews and hidden windows.
+- Skip redundant settings updates when unrelated app styles change.
 
-## Refresh with one prompt
+The visible border keeps its established appearance. This release does not claim zero-cost animation or a measured reduction in native app temperature. See the [performance audit](https://github.com/LoganVoss/Glow/blob/main/docs/performance.md) and [verification record](https://github.com/LoganVoss/Glow/blob/main/docs/verification.md).
 
-Paste this into ChatGPT or Codex with file and Terminal access to your Mac, and point it at your existing Glow folder:
+## Refresh
 
-```text
-Update Glow (Codex/ChatGPT Appearance Plugin) to work with the latest updated build of Codex/ChatGPT app. The most recent app update broke the plugin.
-```
-
-The assistant can review your app and prepare the update. Finish with its command in a separate Terminal window: **READY → Command-Q → DONE → reopen**. Keep your `.local/` backups and private signing identity. No Apple Developer account or new publisher signature is required.
+Update your existing clean checkout with `git pull --ff-only`, preserving local edits and `.local/` recovery files. Run `"./Refresh Neon Codex.command" --local-signing` in a separate Terminal window, then **READY → Command-Q → DONE → reopen**. Your settings and persistent local signing identity are retained; no Apple Developer account is required.
 
 [Install](https://github.com/LoganVoss/Glow#install-with-one-prompt) · [Manual refresh](https://github.com/LoganVoss/Glow/blob/main/docs/install.md#after-an-app-update) · [Demo](https://www.youtube.com/watch?v=H-9Ug0_luwg)
-
-## Verification
-
-All four reviewed vendor builds pass compatibility checks. Appearance, sidebar, border geometry, runtime, installer, recovery, and signing-policy checks pass. The prepared local build verifies **109 code objects**, passes installation preflight, and starts its packaged renderer with normal, missing, and failing Glow. The dependency audit reports no known vulnerabilities. See the [verification record](https://github.com/LoganVoss/Glow/blob/main/docs/verification.md) for local package and bootstrap results.
 
 **Native post-install testing remains required.** This is an experimental, source-only prerelease for Apple silicon macOS. Local signing adds an app-scoped library-validation exception and removes vendor team-bound capabilities; the result is not notarized. No OpenAI app bundle, account data, or signing material is distributed.
 

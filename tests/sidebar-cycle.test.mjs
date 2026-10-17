@@ -534,6 +534,47 @@ test('existing titlebar command cycles native chats, hidden icon rail, then norm
       await f.close();
     });
 
+    await t.test('route replacements release detached native triggers and geometry while the shell stays mounted', async () => {
+      const f = await fixture(), { page } = f;
+      const result = await page.evaluate(async () => {
+        window.__neonCodexRuntime.destroy();
+        const { createSidebarCycle } = await import('/src/sidebar-cycle.js');
+        const cycle = createSidebarCycle(window);
+        window.__sidebarRetentionProbe = cycle;
+        cycle.cycle({ open: false, setOpen() {} });
+        const shell = document.querySelector('[data-app-shell-frame]');
+        let geometry = document.createElement('div'); geometry.className = 'group/panel-resizer'; shell.append(geometry);
+        cycle.reconcile();
+        window.__retiredSidebarNodes = [];
+        let restored = true;
+        for (let i = 0; i < 30; i++) {
+          const trigger = document.querySelector('#toggle-sidebar');
+          const replacement = document.createElement('button');
+          replacement.id = 'toggle-sidebar'; replacement.setAttribute('data-app-shell-sidebar-trigger', '');
+          replacement.setAttribute('aria-controls', 'app-shell-sidebar');
+          trigger.replaceWith(replacement);
+          const nextGeometry = document.createElement('div'); nextGeometry.className = 'group/panel-resizer';
+          geometry.replaceWith(nextGeometry);
+          cycle.reconcile();
+          restored &&= !trigger.hasAttribute('data-neon-sidebar-layout') && !trigger.hasAttribute('aria-description') && !geometry.hasAttribute('data-neon-sidebar-geometry');
+          // The preview's native command intentionally retains its original
+          // trigger. Later replacements are owned only by this controller.
+          if (i > 0) window.__retiredSidebarNodes.push(new WeakRef(trigger));
+          window.__retiredSidebarNodes.push(new WeakRef(geometry));
+          geometry = nextGeometry;
+        }
+        return { restored, hidden: cycle.getHidden(), active: document.querySelector('#toggle-sidebar').getAttribute('data-neon-sidebar-layout') };
+      });
+      assert.deepEqual(result, { restored: true, hidden: true, active: 'expanded' },
+        'Retired native nodes relinquish Glow attributes immediately without disturbing the active layout');
+      const cdp = await page.context().newCDPSession(page);
+      await cdp.send('HeapProfiler.collectGarbage');
+      const retained = await page.evaluate(() => window.__retiredSidebarNodes.filter(reference => reference.deref()).length);
+      assert.equal(retained, 0, 'The live controller must not keep detached route nodes alive');
+      await page.evaluate(() => { window.__sidebarRetentionProbe.destroy(); delete window.__sidebarRetentionProbe; delete window.__retiredSidebarNodes; });
+      await cdp.detach(); await f.close();
+    });
+
     await t.test('destroy restores original layout, profile and native command behavior', async () => {
       const f = await fixture(), { page } = f;
       const initial = await snapshot(page);

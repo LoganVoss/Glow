@@ -42,6 +42,39 @@ export function startNeonCodex(win = window) {
     const explicit = doc.documentElement.getAttribute('data-reduced-motion');
     return explicit === 'true' || (explicit !== 'false' && motionMedia.matches);
   }
+  let lastReducedMotion = reducedMotion();
+  // One observer covers the border and four prepared previews. Invisible light
+  // must not keep repainting; pause its clock, rather than remove/restart it.
+  const animationTargets = new Map();
+  function syncAnimation(frame, allowDissolve = false) {
+    const state = animationTargets.get(frame);
+    if (!state || destroyed) return;
+    const visible = state.visible && frame.isConnected && frame.style.visibility !== 'hidden' && !doc.hidden;
+    const lit = frame.dataset.enabled !== 'false' && Number(frame.style.getPropertyValue('--neon-intensity') || 1) > 0;
+    const rendering = visible && lit ? 'active' : 'paused';
+    if (visible && !lit && allowDissolve && frame.dataset.rendering === 'active') {
+      // Match the 620ms opacity dissolve, including a small completion margin.
+      // Repeated settings updates do not extend the deadline.
+      if (state.timer === null) state.timer = win.setTimeout(() => {
+        state.timer = null; syncAnimation(frame);
+      }, 660);
+      return;
+    }
+    if (state.timer !== null) { win.clearTimeout(state.timer); state.timer = null; }
+    if (frame.dataset.rendering !== rendering) frame.dataset.rendering = rendering;
+  }
+  const animationObserver = new win.IntersectionObserver(entries => {
+    for (const entry of entries) {
+      const state = animationTargets.get(entry.target);
+      if (!state) continue;
+      state.visible = entry.isIntersecting;
+      syncAnimation(entry.target, true);
+    }
+  });
+  function visibilityChanged() {
+    for (const frame of animationTargets.keys()) syncAnimation(frame);
+    if (doc.hidden) panel?.suspend();
+  }
   function element(tag, attrs = {}, children = []) {
     const node = doc.createElement(tag);
     for (const [key, value] of Object.entries(attrs)) {
@@ -57,6 +90,9 @@ export function startNeonCodex(win = window) {
     if (sample) frame.classList.add('neon-glow-sample');
     frame.append(element('div', { class: 'neon-glow-blur' }, [element('div', { class: 'neon-glow-color' })]),
       element('div', { class: 'neon-glow-edge' }), element('div', { class: 'neon-glow-depth' }));
+    frame.dataset.rendering = 'paused';
+    animationTargets.set(frame, { visible: false, timer: null });
+    animationObserver.observe(frame);
     return frame;
   }
   function makeBloom(id) {
@@ -86,7 +122,7 @@ export function startNeonCodex(win = window) {
       svgNode('path', { d: path, fill: 'url(#' + fillID + ')', stroke: 'url(#' + edgeID + ')', 'stroke-width': '.075', filter: 'url(#' + shadowID + ')' }),
     ]);
   }
-  function applyOverlay(frame, theme, pattern = preferences.profiles[theme].pattern) {
+  function applyOverlay(frame, theme, pattern = preferences.profiles[theme].pattern, patternSample = false) {
     const p = preferences.profiles[theme], variables = profileVariables(p);
     // Color scrubbing only changes the target colors. Inspect the animation
     // clock when speed changes, avoiding forced style reads for every hue.
@@ -97,7 +133,10 @@ export function startNeonCodex(win = window) {
     for (const [name, value] of Object.entries(variables)) {
       if (frame.style.getPropertyValue(name) !== value) frame.style.setProperty(name, value);
     }
-    Object.assign(frame.dataset, { theme, pattern, enabled: String(preferences.enabled), reducedMotion: String(reducedMotion()) });
+    for (const [name, value] of Object.entries({ theme, pattern, enabled: String(patternSample || preferences.enabled), reducedMotion: String(reducedMotion()) })) {
+      if (frame.dataset[name] !== value) frame.dataset[name] = value;
+    }
+    syncAnimation(frame, true);
     if (!durationChanged) return;
     const running = frame.isConnected && frame.getAnimations?.().find(animation => animation.animationName === 'neon-glow-orbit');
     if (!running?.effect) return;
@@ -124,13 +163,16 @@ export function startNeonCodex(win = window) {
   }
   function updateRuntime() {
     if (destroyed) return;
+    lastReducedMotion = reducedMotion();
     const type = doc.documentElement.getAttribute('data-codex-window-type');
     if (type !== lastWindowType) { lastWindowType = type; sidebar?.reconcile(); }
     const theme = effectiveTheme();
     if (theme !== lastActualTheme) {
       initializeForTheme(theme); lastActualTheme = theme; panel?.setEditing(theme);
     }
-    layer?.update(); panel?.update();
+    layer?.update();
+    if (layer?.getFrame()) syncAnimation(layer.getFrame(), true);
+    panel?.update();
   }
   function changed() { updateRuntime(); queueSave(); }
   function flush() { if (saveTimer !== null) { win.clearTimeout(saveTimer); persist(); } }
@@ -428,7 +470,7 @@ export function startNeonCodex(win = window) {
       profilePanel.setAttribute('aria-labelledby', tabButtons[editing].id); preview.dataset.theme = editing;
       applyOverlay(sample, editing);
       for (const [name, button, frame] of patternButtons) {
-        button.setAttribute('aria-pressed', String(p.pattern === name)); applyOverlay(frame, editing, name); frame.dataset.enabled = 'true';
+        button.setAttribute('aria-pressed', String(p.pattern === name)); applyOverlay(frame, editing, name, true);
       }
       for (const [name, button] of paletteButtons) button.setAttribute('aria-pressed', String(p.palette === name));
       root.dataset.solo = String(p.solo); solo.setAttribute('aria-pressed', String(p.solo));
@@ -449,7 +491,7 @@ export function startNeonCodex(win = window) {
       if (reducedMotion()) cancelFlourishes();
     }
     update();
-    return { root, update, setEditing(theme) { if (editing !== theme) cancelFlourishes(); editing = theme; }, persistence(saved) { persistenceNote.hidden = saved; }, destroy() { stageObserver.disconnect(); win.removeEventListener('resize', cancelConstellation); cancelFlourishes(); root.remove(); } };
+    return { root, update, suspend: cancelFlourishes, setEditing(theme) { if (editing !== theme) cancelFlourishes(); editing = theme; }, persistence(saved) { persistenceNote.hidden = saved; }, destroy() { stageObserver.disconnect(); win.removeEventListener('resize', cancelConstellation); cancelFlourishes(); root.remove(); } };
   }
 
   // Build the complete panel before its route is visible. React's ref only moves
@@ -498,7 +540,14 @@ export function startNeonCodex(win = window) {
       }
     }
   });
-  const themeObserver = new win.MutationObserver(updateRuntime);
+  const themeObserver = new win.MutationObserver(() => {
+    if (destroyed) return;
+    if (effectiveTheme() !== lastActualTheme || reducedMotion() !== lastReducedMotion ||
+        doc.documentElement.getAttribute('data-codex-window-type') !== lastWindowType) updateRuntime();
+    // Unrelated host classes/styles must not rewrite every settings control.
+    // They can still alter inherited surface geometry, so keep that measured.
+    else layer.reconcile();
+  });
   function storageChanged(event) {
     if ((event.key === STORAGE_KEY || event.key === null) && (event.storageArea == null || event.storageArea === storage)) {
       const remote = loadPreferences(storage);
@@ -520,7 +569,13 @@ export function startNeonCodex(win = window) {
     reset() { preferences = defaultPreferences(); changed(); },
     destroy() {
       if (destroyed) return; flush(); destroyed = true;
-      structureObserver.disconnect(); themeObserver.disconnect(); sidebar.destroy(); layer.destroy(); panel.destroy(); themeTransition.destroy();
+      structureObserver.disconnect(); themeObserver.disconnect();
+      // Restoring the sidebar can request geometry. Make that callback inert
+      // before releasing animation registrations, including during late startup.
+      layer.destroy(); sidebar.destroy(); panel.destroy(); themeTransition.destroy();
+      animationObserver.disconnect();
+      for (const state of animationTargets.values()) if (state.timer !== null) win.clearTimeout(state.timer);
+      animationTargets.clear(); doc.removeEventListener('visibilitychange', visibilityChanged);
       colorMedia.removeEventListener('change', updateRuntime); motionMedia.removeEventListener('change', updateRuntime);
       win.removeEventListener('storage', storageChanged); win.removeEventListener('pagehide', flush); doc.removeEventListener('DOMContentLoaded', ready);
       activeSlot = null; delete win.__neonCodexRuntime;
@@ -530,6 +585,7 @@ export function startNeonCodex(win = window) {
   themeObserver.observe(doc.documentElement, { attributes: true, attributeFilter: ['data-theme', 'class', 'style', 'data-reduced-motion', 'data-codex-window-type'] });
   colorMedia.addEventListener('change', updateRuntime); motionMedia.addEventListener('change', updateRuntime);
   win.addEventListener('storage', storageChanged); win.addEventListener('pagehide', flush);
+  doc.addEventListener('visibilitychange', visibilityChanged);
   if (doc.body) ready(); else doc.addEventListener('DOMContentLoaded', ready, { once: true });
   return runtime;
 }

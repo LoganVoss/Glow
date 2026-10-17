@@ -63,6 +63,8 @@ Record the patch version, app version/build, macOS version, display scaling, and
 - [ ] Ordinary chat, project navigation, and the features used by this account still work.
 - [ ] Sign-in, integrations, notifications, and shared services work where applicable.
 - [ ] Idle and active use show no sustained excessive CPU/GPU usage, fan activity, stutter, or growing memory use compared with the original app.
+- [ ] With no run active, compare the same chat for two minutes each with Glow on, off, and the window minimized. Record renderer/GPU CPU and memory in Activity Monitor, display scale, and other active workloads; repeat in reverse order. A warm computer alone does not identify which process caused it.
+- [ ] After the off dissolve, the invisible border stops animating. Minimize/restore and scroll Appearance previews out of view/back: animation resumes smoothly, settings persist, and the live visible border stays continuous through navigation.
 - [ ] Sleep/wake and moving the window between displays preserve geometry and animation state.
 
 Record failures with a minimal reproduction and a redacted diagnostic. A successful preview or package validation must not be recorded as a native pass.

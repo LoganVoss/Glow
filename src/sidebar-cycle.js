@@ -137,6 +137,10 @@ export function createSidebarCycle(win, { onGeometryChange = () => {} } = {}) {
   }
   function reconcile() {
     if (destroyed || !doc.body) return;
+    // The shell can survive route changes while React replaces its titlebar or
+    // geometry nodes. Release their saved attributes immediately; keeping them
+    // until the entire shell unmounts would retain detached route subtrees.
+    for (const node of saved.keys()) if (!node.isConnected) restoreAttributes(node);
     const next = anchors();
     if (current && (!next || ['shell', 'rail', 'panel', 'clip', 'content', 'profile'].some(key => current[key] !== next[key]))) restore();
     if (next && !current) {

@@ -9,7 +9,7 @@ const px = value => `${Math.round(value * 1000) / 1000}px`;
 export function createGlowLayer(win, { makeOverlay, applyOverlay, getTheme }) {
   const doc = win.document;
   let frame = null, probe = null, row = null, shell = null, surface = null;
-  let lastGeometry = null, scheduled = null, destroyed = false;
+  let hasGeometry = false, scheduled = null, destroyed = false;
   const resizeObserver = typeof win.ResizeObserver === 'function' ? new win.ResizeObserver(reconcile) : null;
   // Observe only our current geometry anchors. The runtime owns the bounded
   // route-structure observer and calls reconcile synchronously on replacements.
@@ -17,6 +17,9 @@ export function createGlowLayer(win, { makeOverlay, applyOverlay, getTheme }) {
 
   function setStyle(node, name, value) {
     if (node.style.getPropertyValue(name) !== value) node.style.setProperty(name, value);
+  }
+  function setAnchorState(value) {
+    if (frame.dataset.neonAnchorState !== value) frame.dataset.neonAnchorState = value;
   }
   function ensureFrame() {
     if (!frame) {
@@ -126,20 +129,27 @@ export function createGlowLayer(win, { makeOverlay, applyOverlay, getTheme }) {
       geometryObserver.observe(node, { attributes: true, attributeFilter: ['style', 'class', 'dir', 'data-app-shell-page-surface'] });
     }
   }
+  function releaseAnchors() {
+    resizeObserver?.disconnect(); geometryObserver.disconnect();
+    row = null; shell = null; surface = null;
+  }
   function commit(geometry) {
     for (const name of ['left', 'top', 'width', 'height']) setStyle(frame, name, px(geometry[name]));
     for (const [name, value] of Object.entries(geometry.radii)) setStyle(frame, name, value);
     setStyle(frame, 'corner-shape', geometry.cornerShape);
     setStyle(frame, '--neon-render-scale', String(geometry.scale));
     setStyle(frame, 'visibility', 'visible');
-    frame.dataset.neonAnchorState = 'active';
-    lastGeometry = geometry;
+    setAnchorState('active');
+    // The styles retain all geometry needed across route gaps. Holding the
+    // measurement's source node would also retain its detached route subtree.
+    hasGeometry = true;
   }
   function reconcile() {
     if (destroyed || !doc.body) return;
+    if ([row, shell, surface].some(node => node && !node.isConnected)) releaseAnchors();
     const type = windowType();
     if (type && type !== 'electron') {
-      if (frame) { setStyle(frame, 'visibility', 'hidden'); frame.dataset.neonAnchorState = 'suspended'; }
+      if (frame) { setStyle(frame, 'visibility', 'hidden'); setAnchorState('suspended'); }
       return;
     }
     // Missing or temporarily false shell attributes are route gaps, not an
@@ -151,8 +161,8 @@ export function createGlowLayer(win, { makeOverlay, applyOverlay, getTheme }) {
       }
     }
     if (!candidate) {
-      if (frame && lastGeometry) {
-        ensureFrame(); setStyle(frame, 'visibility', 'visible'); frame.dataset.neonAnchorState = 'retained';
+      if (frame && hasGeometry) {
+        ensureFrame(); setStyle(frame, 'visibility', 'visible'); setAnchorState('retained');
       }
       return;
     }
@@ -182,12 +192,12 @@ export function createGlowLayer(win, { makeOverlay, applyOverlay, getTheme }) {
       if (destroyed) return;
       destroyed = true;
       if (scheduled !== null) win.cancelAnimationFrame(scheduled);
-      resizeObserver?.disconnect(); geometryObserver.disconnect();
+      releaseAnchors();
       win.removeEventListener('resize', scheduleGeometry);
       win.removeEventListener('scroll', scheduleGeometry, true);
       win.visualViewport?.removeEventListener('resize', scheduleGeometry);
       win.visualViewport?.removeEventListener('scroll', scheduleGeometry);
-      frame?.remove(); frame = null; probe = null; row = null; shell = null; surface = null; lastGeometry = null;
+      frame?.remove(); frame = null; probe = null; hasGeometry = false;
     },
   };
 }

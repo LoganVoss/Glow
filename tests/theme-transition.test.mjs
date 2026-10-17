@@ -200,6 +200,61 @@ test('native theme color dissolve keeps controls, layout motion, and cleanup int
       await f.close();
     });
 
+    await t.test('removed subtrees release immediately with RAF suspended and do not scan surviving controls', async () => {
+      const f = await fixture(), { page } = f;
+      await page.evaluate(() => {
+        const mount = document.querySelector('#mount');
+        for (let i = 0; i < 200; i++) {
+          const button = document.createElement('button'); button.className = 'retained-control'; mount.append(button);
+        }
+        const branch = document.createElement('div'); branch.id = 'removed-branch';
+        const control = document.createElement('button'); control.id = 'removed-control';
+        control.style.setProperty('--neon-theme-base-transition', 'opacity 70ms', 'important');
+        branch.append(control); mount.append(branch);
+        for (let i = 0; i < 50; i++) { const node = document.createElement('span'); node.className = 'streamed-markup'; mount.append(node); }
+      });
+      await page.waitForFunction(() => document.querySelector('#removed-control').hasAttribute('data-neon-theme-colors'));
+      const result = await page.evaluate(async () => {
+        let reads = 0, frames = 0;
+        const connected = Object.getOwnPropertyDescriptor(Node.prototype, 'isConnected').get;
+        for (const node of document.querySelectorAll('.retained-control')) {
+          Object.defineProperty(node, 'isConnected', { configurable: true, get() { reads++; return connected.call(this); } });
+        }
+        const raf = window.requestAnimationFrame;
+        // A background window may not get another animation frame for minutes.
+        window.requestAnimationFrame = () => { frames++; return -frames; };
+        const control = document.querySelector('#removed-control');
+        // Cleanup cannot depend on Glow's marker still being present.
+        control.removeAttribute('data-neon-theme-colors');
+        document.querySelector('#removed-branch').remove();
+        for (const node of document.querySelectorAll('.streamed-markup')) node.remove();
+        await new Promise(resolve => setTimeout(resolve, 0));
+        const restored = [control.style.getPropertyValue('--neon-theme-base-transition'), control.style.getPropertyPriority('--neon-theme-base-transition')];
+        window.requestAnimationFrame = raf;
+        return { reads, frames, restored };
+      });
+      assert.deepEqual(result, { reads: 0, frames: 0, restored: ['opacity 70ms', 'important'] },
+        'Detaching markup must neither scan the live conversation nor wait for a visible-window frame to release controls');
+      await f.close();
+    });
+
+    await t.test('moving a prepared control between native containers preserves its original transition', async () => {
+      const f = await fixture(), { page } = f;
+      const result = await page.evaluate(async () => {
+        const button = document.querySelector('#button');
+        const before = button.style.getPropertyValue('--neon-theme-base-transition');
+        document.querySelector('#mount').append(button);
+        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        const after = button.style.getPropertyValue('--neon-theme-base-transition');
+        const marked = button.getAttribute('data-neon-theme-colors');
+        window.transition.destroy();
+        return { before, after, marked, restored: button.style.getPropertyValue('--neon-theme-base-transition') };
+      });
+      assert.equal(result.before, result.after);
+      assert.equal(result.marked, 'v1'); assert.equal(result.restored, '');
+      await f.close();
+    });
+
     await t.test('native PageSurface keeps its own layout transitions during the dissolve', async () => {
       const f = await fixture(), { page } = f;
       await page.evaluate(() => {

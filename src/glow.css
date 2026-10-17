@@ -16,8 +16,8 @@
 @property --neon-color-5 { syntax: "<color>"; inherits: true; initial-value: #6fdfb6; }
 @property --neon-color-6 { syntax: "<color>"; inherits: true; initial-value: #69b6ff; }
 
-/* The clock stays alive when the light is off. Changing enabled only changes
-   opacity, so a quick reversal dissolves from the current image and intensity. */
+/* Enabled changes dissolve through opacity. The runtime pauses this clock
+   after the fade, or while its surface is hidden, and resumes the same phase. */
 @keyframes neon-glow-orbit {
   from { --neon-phase: 0deg; }
   to { --neon-phase: 360deg; }
@@ -82,9 +82,9 @@
 }
 
 [data-neon-codex-frame][data-enabled="false"] { opacity: 0; }
-/* Legacy pause remains harmless. The runtime reverses the animation effect
-   while reflecting its current phase, keeping the positive clock continuous. */
+/* Legacy explicit pause and lifecycle suspension preserve the same clock. */
 [data-neon-codex-frame][data-paused="true"] { animation-play-state: paused; }
+[data-neon-codex-frame][data-rendering="paused"] { animation-play-state: paused; }
 
 /* Blur a completed rounded ring, then clip the composite to the same curve.
    Every pattern uses this same mask: no tiles, corner pieces, or moving edges. */

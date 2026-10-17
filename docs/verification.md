@@ -1,5 +1,17 @@
 # Verification
 
+## 0.10.8 — Memory and idle-rendering audit, October 17, 2026
+
+Fixed retained detached sidebar controls and native route surfaces. Saved geometry now keeps the painted dimensions without holding a removed DOM tree. Theme cleanup releases only removed subtrees, works with suspended animation frames, and avoids whole-conversation rescans. The runtime skips unchanged Appearance updates, suspends offscreen previews and hidden documents, and pauses a disabled or zero-intensity border after its dissolve. Quick reversals and visible motion retain the same animation clock. Destroy cleanup also covers late native-window initialization.
+
+All **13 focused rendering/runtime performance cases** pass. They cover removed native surfaces becoming collectible, 12 start/destroy cycles with 120 Appearance remounts, complete observer/listener cleanup, utility-window transitions, no-op host updates with real geometry changes, stable paused clocks with zero paint, and visibility restoration. Additional sidebar/theme regressions verify collection of 59 retired sidebar nodes and incremental cleanup without animation frames. The full **24-case Glow browser suite**, **4 early-window startup cases**, **21 sidebar cases**, **12 theme cases**, and **84 source/runtime/compatibility/transform tests** pass. Installer, refresh, and recovery checks pass; dependency audits report no known vulnerabilities.
+
+The isolated five-second Chromium comparison recorded **900 → 0 paint events** after the off dissolve and **2,700 → 900** with previews offscreen while the border remained visible. Offscreen-preview renderer task time fell **419.25 → 191.26 ms**. Visible workspace animation cost stayed in its previous range; no native thermal improvement is claimed. Rejected renderer prototypes were not shipped. Conditions, limits, and reproduction commands are in the [performance audit](performance.md).
+
+Final preparation returned **READY** for Glow **0.10.8** on **26.1013.31256 (20586)**, reused the persistent local identity, verified **109 code objects**, and passed installation preflight. All nine source hashes and five packaged JavaScript modules match the final source, including the route-retention fix. Exactly nine packed renderer entries changed; the builder's archive, CSP, fuse, vendor-source, and installed-baseline preservation checks passed.
+
+All **three isolated packaged-bootstrap cases** passed: normal, deliberately failing, and missing Glow; the normal case imports the actual Settings and patched Appearance modules. The hosted app was not quit, replaced, or launched. These checks do not establish native account functionality, macOS window occlusion, or sustained thermal behavior; complete the [native smoke test](smoke-test.md) after installation.
+
 ## 0.10.7 — App update compatibility, October 16, 2026
 
 The installed app **26.1013.31256 (20586)** was confirmed up to date through its configured updater. Its Appearance exports, native sidebar command bindings, and page-surface class changed. Each was reviewed against the actual OpenAI-signed archive and the preserved previous build before recording the new source pin. All four actual vendor sources (**20586**, **20398**, **20156**, **20052**) pass compatibility inspection.

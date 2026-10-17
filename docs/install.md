@@ -1,6 +1,6 @@
 # Install Glow
 
-Glow 0.10.7 builds and signs a local copy of your app, then replaces the app after you quit. Its border and controls live in **Settings → Appearance → Glow**. No Apple Developer membership, Apple-issued certificate, or signature from Glow's publisher is required.
+Glow 0.10.8 builds and signs a local copy of your app, then replaces the app after you quit. Its border and controls live in **Settings → Appearance → Glow**. No Apple Developer membership, Apple-issued certificate, or signature from Glow's publisher is required.
 
 This is an experimental local modification, not a notarized distribution. See [verification](verification.md) for what has actually been tested.
 

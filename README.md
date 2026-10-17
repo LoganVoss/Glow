@@ -32,7 +32,7 @@ Glow also includes a sidebar toggle tweak. Once Glow is installed, you can use t
 
 ## Install with one prompt
 
-**No Apple Developer account or Apple signing certificate required.** Glow 0.10.7 creates a private signing identity on your Mac and reuses it when you refresh. It stays inside your normal app and its Appearance settings.
+**No Apple Developer account or Apple signing certificate required.** Glow 0.10.8 creates a private signing identity on your Mac and reuses it when you refresh. It stays inside your normal app and its Appearance settings.
 
 This is an experimental local modification, **not notarized**. It adds an app-scoped library-validation exception and removes vendor team-bound capabilities. Hardened runtime, Electron fuses, and Content Security Policy are preserved; system-wide protections and quarantine are unchanged. [Verification and remaining native checks →](docs/verification.md)
 
@@ -93,6 +93,8 @@ Keep your Glow folder, `.local/` backups, and private signing identity. No Apple
 ## How it integrates
 
 Glow verifies the OpenAI-signed source, stages a local copy, and adds its renderer and controls to the existing Appearance panel. The selected signing mode signs the modified bundle. After you quit, the installer replaces your app and retains the previous bundle for recovery. Glow’s renderer makes no network requests; its preferences stay local.
+
+Invisible glow layers pause after fading out; offscreen previews and hidden windows also stop their animation clocks. The visible border keeps its continuous motion. [Performance audit →](docs/performance.md)
 
 Both modes replace OpenAI’s signature and remove entitlements tied to OpenAI’s signing team. Local signing also adds an app-scoped library-validation exception so code signed by your local identity can load; certificate-based mode retains library validation. Sign-in, integrations, and updating require native verification. This repository distributes source, not a signed or notarized OpenAI application. [Build details](docs/build-and-restore.md) · [Verification](docs/verification.md) · [Security](SECURITY.md)
 
