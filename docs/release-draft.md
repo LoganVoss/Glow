@@ -1,12 +1,12 @@
-# Glow 0.10.9 — App update compatibility
+# Glow 0.10.10 — App update compatibility
 
-Restores Glow support for **Codex/ChatGPT 26.1013.40934 (20770)**. Created by **Logan Voss + Astra 6 Ultra**.
+Restores Glow support for **Codex/ChatGPT 26.1016.51333 (21161)**. Created by **Logan Voss + Astra 6 Ultra**.
 
-The updated OpenAI-signed app was reviewed against the previous build. Its Appearance controls, native sidebar command, and window geometry retain the existing integration, so Glow's design and runtime are unchanged. The memory and idle-rendering fixes from 0.10.8 remain included.
+This update adapts Glow to the app's renamed Appearance and sidebar controls. The integration was reviewed against the actual OpenAI-signed build, with explicit checks for each supported version. Glow's design, saved preferences, and memory and idle-rendering fixes remain unchanged.
 
 ## Refresh
 
-Update your existing clean checkout with `git pull --ff-only`, preserving local edits and `.local/` recovery files. Run `"./Refresh Neon Codex.command" --local-signing` in a separate Terminal window, then **READY → Command-Q → DONE → reopen**. Your settings and persistent local signing identity are retained; no Apple Developer account is required.
+Update your existing clean checkout with `git pull --ff-only`, preserving local edits and `.local/` recovery files. Run `"./Refresh Neon Codex.command" --local-signing` in a separate Terminal window, then **READY → Command-Q → DONE → reopen**. Your persistent local signing identity is reused; no Apple Developer account is required.
 
 [Install](https://github.com/LoganVoss/Glow#install-with-one-prompt) · [Refresh instructions](https://github.com/LoganVoss/Glow/blob/main/docs/install.md#after-an-app-update) · [Verification](https://github.com/LoganVoss/Glow/blob/main/docs/verification.md) · [Demo](https://www.youtube.com/watch?v=H-9Ug0_luwg)
 

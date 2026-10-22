@@ -1,5 +1,15 @@
 # Verification
 
+## 0.10.10 — App update compatibility, October 21, 2026
+
+Reviewed the actual OpenAI-signed **26.1016.51333 (21161)** archive against preserved build **20770** before adding its source pin. This build renamed the Appearance bindings and mount expression, plus the native sidebar command bindings. Explicit reviewed variants now preserve the native component/key, scoped non-optimistic theme writer, complete sidebar memoization/registration, and native fallback. Unknown or mixed variants remain rejected. Native page-surface geometry, rail/footer/account structure, and Settings Home contracts remain compatible; Glow's runtime, visuals, preferences, and 0.10.8 performance fixes are unchanged. The new vendor CSP is preserved without modification.
+
+Passed **94 source/runtime/compatibility/transform tests**, **24 Glow browser cases**, **21 sidebar cases**, **12 theme cases**, **4 early-window startup cases**, and **13 rendering/runtime performance cases**. All six reviewed OpenAI-signed builds pass compatibility inspection. Refresh, recovery, installer, and archive-preservation checks passed. The package audit found no known dependency vulnerabilities, broken local Markdown/image links, non-executable launchers, or tracked private build/signing artifacts.
+
+Preparation returned **READY** for Glow **0.10.10** on build **21161**, reused the persistent local identity, verified **109 code objects**, and passed installation preflight. All nine source hashes and five packaged JavaScript modules match the source. Exactly nine packed renderer entries changed. The packaged Appearance and initial renderer equal the reviewed transformations; the native settings bridge and general-settings modules are unchanged. CSP, Electron fuses, original packed payload, vendor source, and installed baseline passed preservation checks.
+
+All **three isolated packaged-bootstrap cases** passed: normal, deliberately failing, and missing Glow. Normal startup also imports the actual Settings and patched Appearance modules. The hosted app was not quit, replaced, or launched. These checks do not establish native sign-in, account integrations, updater behavior, or sustained thermal performance; complete the [native smoke test](smoke-test.md) after installation.
+
 ## 0.10.9 — App update compatibility, October 18, 2026
 
 Reviewed the actual OpenAI-signed **26.1013.40934 (20770)** archive against preserved build **20586** before adding its source pin. The Appearance component and main general-settings module match after normalizing hashed imports. React/JSX/cache bindings, AppScope, the theme schema, and the scoped non-optimistic writer remain unchanged. The complete sidebar command, memoization, titlebar dispatch, and command registration retain the reviewed variant. Native workspace, rail, footer/account controls, surface class map, and surface CSS are unchanged; Settings differs only in hashed imports. No Glow runtime or visual changes were needed, and the 0.10.8 memory and idle-rendering fixes remain included.

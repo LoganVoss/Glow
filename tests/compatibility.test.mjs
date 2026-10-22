@@ -11,7 +11,7 @@ function fixture(variant = SIDEBAR_VARIANTS[0], appearance = APPEARANCE_VARIANTS
   const assets = new Map(Object.entries({
     'webview/index.html': '<head><meta http-equiv="Content-Security-Policy" content="default-src \'self\'">\n<link href="./assets/app-shared-a1.css">\n<script type="module" src="./assets/entry-a1.js"></script>\n</head><body></body>',
     'webview/assets/app-shared-a1.css': ':root{color:black}',
-    'webview/assets/appearance-settings-a1.js': `import{${appearance.jsx} as ${appearance.jsxAlias},${appearance.cache} as ${appearance.cacheAlias},${appearance.react} as r}from"./app-shared-a1.js";import{n as u}from"./general-settings-a1.js";var m,h,p;m=r();h=${appearance.jsxAlias}();p=${appearance.cacheAlias}();function f(){const i=true;return ${APPEARANCE_NEEDLE}}`,
+    'webview/assets/appearance-settings-a1.js': `import{${appearance.jsx} as ${appearance.jsxAlias},${appearance.cache} as ${appearance.cacheAlias},${appearance.react} as ${appearance.reactAlias}}from"./app-shared-a1.js";import{n as u}from"./general-settings-a1.js";var m,h,p;m=${appearance.reactAlias}();h=${appearance.jsxAlias}();p=${appearance.cacheAlias}();function f(){const i=true,o=true;return ${appearance.mountNeedle}}`,
     'webview/assets/app-shared-a1.js': `export{a as ${appearance.scopeHook},b as ${appearance.scope},c as ${appearance.settings},d as ${appearance.write},e as ${appearance.jsx},f as ${appearance.react},g as ${appearance.cache}};`,
     'webview/assets/general-settings-a1.js': `import{${appearance.scopeHook} as N,${appearance.scope} as P,${appearance.settings} as Xt,${appearance.write} as V}from"./app-shared-a1.js";function theme(){let t=N(P);return e=>V(t,Xt.theme,e,{optimistic:!1})}`,
     'webview/assets/entry-a1.js': 'import "./app-initial-a1.js";',
@@ -147,4 +147,14 @@ test('latest Appearance bindings require matching bridge and native writer befor
   assert.equal(inspect(f,{[result.candidateSourcePin.key]:result.candidateSourcePin.value}).status,'compatible-known');
   change(f,'general-settings','optimistic:!1','optimistic:!0');
   reject(f,/native non-optimistic appearance writer/);
+});
+
+test('latest Appearance bindings cannot use an older mount or React initializer', () => {
+  const latest=APPEARANCE_VARIANTS.at(-1);
+  let f=fixture(SIDEBAR_VARIANTS.at(-1),latest);
+  change(f,'appearance-settings',latest.mountNeedle,APPEARANCE_NEEDLE);
+  reject(f,/exactly one native Appearance mount/);
+  f=fixture(SIDEBAR_VARIANTS.at(-1),latest);
+  change(f,'appearance-settings',`m=${latest.reactAlias}()`,'m=other()');
+  reject(f,/React\/JSX\/cache initialization changed/);
 });

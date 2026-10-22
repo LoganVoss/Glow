@@ -6,8 +6,9 @@ export const APPEARANCE_NEEDLE = '(0,h.jsx)(u,{defaultAdvancedExpanded:i},r)';
 // Reviewed roles, not inferred minifier names. Every binding must belong to one
 // complete variant before the native Appearance mount can be extended.
 export const APPEARANCE_VARIANTS = Object.freeze([
-  Object.freeze({ id: '20052-20398', jsx: 'Agn', jsxAlias: 't', react: 'PCn', cache: 'NCn', cacheAlias: 'n', scopeHook: 'Fan', scope: 'H0t', settings: 'p3t', write: 'wjt' }),
-  Object.freeze({ id: '20586', jsx: 'xMt', jsxAlias: 'n', react: 'yzt', cache: 'vzt', cacheAlias: 't', scopeHook: 'Ixt', scope: 'Cot', settings: '_lt', write: 'qnt' }),
+  Object.freeze({ id: '20052-20398', jsx: 'Agn', jsxAlias: 't', react: 'PCn', reactAlias: 'r', cache: 'NCn', cacheAlias: 'n', scopeHook: 'Fan', scope: 'H0t', settings: 'p3t', write: 'wjt', mountNeedle: APPEARANCE_NEEDLE }),
+  Object.freeze({ id: '20586', jsx: 'xMt', jsxAlias: 'n', react: 'yzt', reactAlias: 'r', cache: 'vzt', cacheAlias: 't', scopeHook: 'Ixt', scope: 'Cot', settings: '_lt', write: 'qnt', mountNeedle: APPEARANCE_NEEDLE }),
+  Object.freeze({ id: '21161', jsx: 'LNt', jsxAlias: 'n', react: 'FBt', reactAlias: 't', cache: 'PBt', cacheAlias: 'r', scopeHook: '$St', scope: 'Qst', settings: 'xut', write: 'lit', mountNeedle: '(0,h.jsx)(u,{defaultAdvancedExpanded:o},r)' }),
 ]);
 
 const count = (source, needle) => source.split(needle).length - 1;
@@ -32,7 +33,6 @@ function hasAlias(bindings, symbol, local) {
 }
 
 export function patchAppearance({ appearance, bridge, general, bridgePath, generalPath }) {
-  assert.equal(count(appearance, APPEARANCE_NEEDLE), 1, 'Expected exactly one native Appearance mount');
   assert.ok(!appearance.includes('__neon') && !appearance.includes('__scope'), 'Reserved mount identifier already exists');
   assert.match(bridgePath, /^webview\/assets\/app-shared-[a-f0-9]+\.js$/, 'Unexpected settings bridge path');
   assert.match(generalPath, /^webview\/assets\/general-settings-[a-f0-9]+\.js$/, 'Unexpected general settings path');
@@ -43,10 +43,11 @@ export function patchAppearance({ appearance, bridge, general, bridgePath, gener
   assert.equal(generalImport.file, generalPath, 'Appearance general settings linkage changed');
   const variant = one(APPEARANCE_VARIANTS.filter(candidate =>
     hasAlias(bridgeImport.bindings, candidate.jsx, candidate.jsxAlias) &&
-    hasAlias(bridgeImport.bindings, candidate.react, 'r') &&
+    hasAlias(bridgeImport.bindings, candidate.react, candidate.reactAlias) &&
     hasAlias(bridgeImport.bindings, candidate.cache, candidate.cacheAlias)), 'reviewed Appearance React/JSX/cache binding variant');
+  assert.equal(count(appearance, variant.mountNeedle), 1, 'Expected exactly one native Appearance mount');
   assert.ok(hasAlias(generalImport.bindings, 'n', 'u'), 'Appearance general settings component import changed');
-  for (const initialization of ['m=r()', `h=${variant.jsxAlias}()`, `p=${variant.cacheAlias}()`]) {
+  for (const initialization of [`m=${variant.reactAlias}()`, `h=${variant.jsxAlias}()`, `p=${variant.cacheAlias}()`]) {
     assert.equal([...appearance.matchAll(new RegExp(`(?<![\\w$])${escapeRE(initialization)}(?![\\w$])`, 'g'))].length, 1, 'Appearance React/JSX/cache initialization changed');
   }
   const exportBlocks = [...bridge.matchAll(/export\{([^}]+)\}/g)];
@@ -62,9 +63,9 @@ export function patchAppearance({ appearance, bridge, general, bridgePath, gener
   const scopeBinding = new RegExp(`(?<![\\w$])${escapeRE(writerMatch[1])}=${escapeRE(local.scopeHook)}\\(${escapeRE(local.scope)}\\)`);
   assert.ok(scopeBinding.test(general), 'Native appearance scope binding changed');
 
-  const replacement = '(0,h.jsxs)("div",{"data-neon-appearance":"v1",children:[(0,h.jsx)(u,{defaultAdvancedExpanded:i},r),(0,h.jsx)(__neonAppearanceSlot,{})]})';
+  const replacement = `(0,h.jsxs)("div",{"data-neon-appearance":"v1",children:[${variant.mountNeedle},(0,h.jsx)(__neonAppearanceSlot,{})]})`;
   // A callback ref attaches the panel before paint, using the native scoped,
   // non-optimistic theme writer. The initial renderer never imports this module.
   const boot = `import{startNeonCodex as __neonBoot}from"./neon-codex.js";import{${variant.scopeHook} as __neonUseScope,${variant.scope} as __neonScope,${variant.settings} as __neonSettings,${variant.write} as __neonWrite}from"./${path.posix.basename(bridgePath)}";function __neonAppearanceSlot(){const __scope=__neonUseScope(__neonScope),__setTheme=m.useCallback(__theme=>{if(__theme!=="light"&&__theme!=="dark")return Promise.reject(new Error("Unsupported appearance mode"));return __neonWrite(__scope,__neonSettings.theme,__theme,{optimistic:false})},[__scope]),__ref=m.useCallback(__slot=>{if(__slot)__neonBoot().mountAppearance(__slot,{setTheme:__setTheme})},[__setTheme]);return(0,h.jsx)("div",{"data-neon-settings-slot":"v1",ref:__ref})}`;
-  return boot + appearance.replace(APPEARANCE_NEEDLE, replacement);
+  return boot + appearance.replace(variant.mountNeedle, replacement);
 }

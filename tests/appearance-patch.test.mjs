@@ -1,12 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
-import { APPEARANCE_NEEDLE, APPEARANCE_VARIANTS, patchAppearance } from '../scripts/appearance-patch.mjs';
+import { APPEARANCE_VARIANTS, patchAppearance } from '../scripts/appearance-patch.mjs';
 
 function fixture(variant) {
   const bridgePath = 'webview/assets/app-shared-aabbcc.js';
   const generalPath = 'webview/assets/general-settings-ddeeff.js';
-  const appearance = `import{${variant.jsx} as ${variant.jsxAlias},${variant.react} as r,${variant.cache} as ${variant.cacheAlias}}from"./app-shared-aabbcc.js";import{n as u}from"./general-settings-ddeeff.js";var p,m,h;function initialize(){p=${variant.cacheAlias}(),m=r(),h=${variant.jsxAlias}()}initialize();function AppearanceSettings(i,r){return ${APPEARANCE_NEEDLE}}`;
+  const appearance = `import{${variant.jsx} as ${variant.jsxAlias},${variant.react} as ${variant.reactAlias},${variant.cache} as ${variant.cacheAlias}}from"./app-shared-aabbcc.js";import{n as u}from"./general-settings-ddeeff.js";var p,m,h;function initialize(){p=${variant.cacheAlias}(),m=${variant.reactAlias}(),h=${variant.jsxAlias}()}initialize();function AppearanceSettings(value,r){const i=value,o=value;return ${variant.mountNeedle}}`;
   const exported = [variant.jsx, variant.react, variant.cache, variant.scopeHook, variant.scope, variant.settings, variant.write];
   const bridge = `export{${exported.map((symbol,index)=>`native${index} as ${symbol}`).join(',')}};`;
   const general = `import{${variant.scopeHook} as useScope,${variant.scope} as scopeAtom,${variant.settings} as settings,${variant.write} as write}from"./app-shared-aabbcc.js";function Theme(){const scope=useScope(scopeAtom);return value=>write(scope,settings.theme,value,{optimistic:!1})}`;
@@ -16,15 +16,15 @@ function fixture(variant) {
 for(const variant of APPEARANCE_VARIANTS) {
   test(`${variant.id}: native mount is preserved and ref mounts the panel with scoped theme writes`, async()=>{
     const input=fixture(variant), patched=patchAppearance(input);
-    assert.equal(patched.split(APPEARANCE_NEEDLE).length-1,1);
-    assert.ok(patched.endsWith(input.appearance.replace(APPEARANCE_NEEDLE,'(0,h.jsxs)("div",{"data-neon-appearance":"v1",children:[(0,h.jsx)(u,{defaultAdvancedExpanded:i},r),(0,h.jsx)(__neonAppearanceSlot,{})]})')));
+    assert.equal(patched.split(variant.mountNeedle).length-1,1);
+    assert.ok(patched.endsWith(input.appearance.replace(variant.mountNeedle,`(0,h.jsxs)("div",{"data-neon-appearance":"v1",children:[${variant.mountNeedle},(0,h.jsx)(__neonAppearanceSlot,{})]})`)));
     const mounts=[],writes=[],dependencies=[],scope={},scopeAtom={},themeAtom={},nativeComponent=()=>{};
     let boots=0;
     const jsx=(type,props,key)=>({type,props,key});
     const context=vm.createContext({
       [variant.jsxAlias]:()=>({jsx,jsxs:jsx}),
       [variant.cacheAlias]:()=>({c:()=>[]}),
-      r:()=>({useCallback:(callback,deps)=>{dependencies.push(deps);return callback;}}),
+      [variant.reactAlias]:()=>({useCallback:(callback,deps)=>{dependencies.push(deps);return callback;}}),
       u:nativeComponent,
       __neonUseScope:atom=>{assert.equal(atom,scopeAtom);return scope;},
       __neonScope:scopeAtom,__neonSettings:{theme:themeAtom},
@@ -58,13 +58,15 @@ for(const variant of APPEARANCE_VARIANTS) {
   test(`${variant.id}: changed mount, bindings, initialization and duplicate imports are rejected`,()=>{
     const original=fixture(variant);
     for(const [before,after] of [
-      [APPEARANCE_NEEDLE,APPEARANCE_NEEDLE+APPEARANCE_NEEDLE],
-      [APPEARANCE_NEEDLE,'null'],
-      [`${variant.react} as r`,`${variant.react} as react`],
+      [variant.mountNeedle,variant.mountNeedle+variant.mountNeedle],
+      [variant.mountNeedle,'null'],
+      [variant.mountNeedle,variant.mountNeedle.replace('defaultAdvancedExpanded:','changedProp:')],
+      [variant.mountNeedle,variant.mountNeedle.replace('},r)','},other)')],
+      [`${variant.react} as ${variant.reactAlias}`,`${variant.react} as react`],
       [`${variant.jsx} as ${variant.jsxAlias}`,`${variant.jsx} as unknown`],
       [`${variant.cache} as ${variant.cacheAlias}`,`${variant.cache} as cache`],
       ['n as u','n as component'],
-      ['m=r()','m=unknown()'],
+      [`m=${variant.reactAlias}()`,'m=unknown()'],
       [`h=${variant.jsxAlias}()`,`h=unknown()`],
       [`p=${variant.cacheAlias}()`,`p=unknown()`],
       ['app-shared-aabbcc.js','app-shared-111111.js'],
@@ -100,8 +102,9 @@ test('Appearance variants cannot mix reviewed roles or accept unknown names',()=
   for(const variant of APPEARANCE_VARIANTS)for(const other of APPEARANCE_VARIANTS){
     if(variant===other)continue;
     const original=fixture(variant);
-    assert.throws(()=>patchAppearance({...original,appearance:original.appearance.replace(`${variant.react} as r`,`${other.react} as r`)}),/variant/);
+    assert.throws(()=>patchAppearance({...original,appearance:original.appearance.replace(`${variant.react} as ${variant.reactAlias}`,`${other.react} as ${variant.reactAlias}`)}),/variant/);
     assert.throws(()=>patchAppearance({...original,appearance:original.appearance.replace(`${variant.jsx} as ${variant.jsxAlias}`,`unknown as ${variant.jsxAlias}`)}),/variant/);
     assert.throws(()=>patchAppearance({...original,general:fixture(other).general}),/native appearance/);
+    if(variant.mountNeedle!==other.mountNeedle)assert.throws(()=>patchAppearance({...original,appearance:original.appearance.replace(variant.mountNeedle,other.mountNeedle)}),/native Appearance mount/);
   }
 });
