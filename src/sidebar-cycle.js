@@ -5,7 +5,7 @@ export const SIDEBAR_STRUCTURE = '[data-app-navigation-rail],.app-shell-left-pan
 const HOME = '[data-sidebar-destination="builtin:home"]';
 const TRIGGER = '[data-app-shell-sidebar-trigger][aria-controls="app-shell-sidebar"]';
 // Only reviewed native workspace surfaces participate in the rail transition.
-const GEOMETRY = ':scope > [data-app-shell-workspace-row] > :is(._PageSurface_yl8z4_2, ._PageSurface_etoz9_2), [class~="group/panel-resizer"]';
+const GEOMETRY = ':scope > [data-app-shell-workspace-row] > :is(._PageSurface_yl8z4_2, ._PageSurface_etoz9_2, ._PageSurface_azz1c_2), [class~="group/panel-resizer"]';
 const px = number => `${Math.round(number * 1000) / 1000}px`;
 const MOTION_MS = 420;
 

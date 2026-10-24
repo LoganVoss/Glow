@@ -12,6 +12,7 @@ import { chromium } from 'playwright';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const BORDER = '[data-neon-global="true"]';
 const HOME = '[data-neon-settings-home]';
+const SURFACES = Object.freeze({ latest: '_PageSurface_azz1c_2', previous: '_PageSurface_etoz9_2', legacy: '_PageSurface_yl8z4_2' });
 const nextPaint = page => page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 const snapshot = page => page.evaluate(() => {
   const shell = document.querySelector('[data-app-shell-frame]');
@@ -35,8 +36,8 @@ test('existing titlebar command cycles native chats, hidden icon rail, then norm
       if (url.pathname === '/preview/index.html' && url.searchParams.get('utility') === 'true') {
         bytes = Buffer.from(bytes.toString().replace('data-codex-window-type="electron"', 'data-codex-window-type="utility"'));
       }
-      if (url.pathname === '/preview/index.html' && url.searchParams.get('surface') === 'legacy') {
-        bytes = Buffer.from(bytes.toString().replace('_PageSurface_etoz9_2', '_PageSurface_yl8z4_2'));
+      if (url.pathname === '/preview/index.html' && Object.hasOwn(SURFACES, url.searchParams.get('surface'))) {
+        bytes = Buffer.from(bytes.toString().replace(SURFACES.latest, SURFACES[url.searchParams.get('surface')]));
       }
       response.writeHead(200, { 'Content-Type': url.pathname.endsWith('.html') ? 'text/html' : url.pathname.endsWith('.js') ? 'text/javascript' : 'text/css' });
       response.end(bytes);
@@ -49,13 +50,13 @@ test('existing titlebar command cycles native chats, hidden icon rail, then norm
   try {
     browser = await chromium.launch({ headless: true, chromiumSandbox: true,
       executablePath: process.env.NEON_TEST_BROWSER || (existsSync(chrome) ? chrome : undefined) });
-    async function fixture({ utility = false, legacySurface = false, ...options } = {}) {
+    async function fixture({ utility = false, surface = 'latest', ...options } = {}) {
       const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, ...options });
       await context.route('**/*', route => new URL(route.request().url()).origin === origin ? route.continue() : route.abort());
       const page = await context.newPage(), errors = [];
       page.setDefaultTimeout(4_000);
       page.on('pageerror', error => errors.push(error.message));
-      const query = new URLSearchParams({ utility: String(utility), surface: legacySurface ? 'legacy' : 'latest' });
+      const query = new URLSearchParams({ utility: String(utility), surface });
       await page.goto(`${origin}/preview/index.html?${query}`);
       await page.waitForFunction(() => typeof window.__neonCodexRuntime?.cycleSidebar === 'function' && window.__neonPreviewSidebar);
       await page.getByRole('button', { name: 'Show workspace', exact: true }).click();
@@ -300,14 +301,14 @@ test('existing titlebar command cycles native chats, hidden icon rail, then norm
       await f.close();
     });
 
-    for (const legacySurface of [false, true]) {
-      await t.test(`the ${legacySurface ? 'legacy' : 'latest'} reviewed surface keeps border geometry and corners through every cycle frame`, async () => {
-        const f = await fixture({ legacySurface }), { page } = f;
-        assert.equal(await page.locator('.page-surface').evaluate(node => node.classList.contains('_PageSurface_etoz9_2')), !legacySurface);
+    for (const [surface, surfaceClass] of Object.entries(SURFACES)) {
+      await t.test(`the ${surface} reviewed surface keeps border geometry and corners through every cycle frame`, async () => {
+        const f = await fixture({ surface }), { page } = f;
+        assert.equal(await page.locator('.page-surface').evaluate((node, className) => node.classList.contains(className), surfaceClass), true);
         await page.locator('.main').evaluate(node => {
           // Lookalike route content is not a native background or geometry anchor.
           const decoy = document.createElement('div'); decoy.id = 'nested-surface-decoy';
-          decoy.className = '_PageSurface_etoz9_2 _PageSurface_yl8z4_2'; decoy.hidden = true; node.append(decoy);
+          decoy.className = '_PageSurface_azz1c_2 _PageSurface_etoz9_2 _PageSurface_yl8z4_2'; decoy.hidden = true; node.append(decoy);
         });
         await page.evaluate(selector => { window.__originalBorder = document.querySelector(selector); }, BORDER);
         const frames = await page.evaluate(async selector => {
@@ -336,7 +337,7 @@ test('existing titlebar command cycles native chats, hidden icon rail, then norm
         assert.ok(frames.length > 20, 'Sample animated geometry over multiple frames');
         for (const click of [1, 2]) {
           const positions = new Set(frames.filter(frame => frame.click === click).map(frame => Math.round(frame.surfaceX * 10)));
-          assert.ok(positions.size > 3, 'The actual native surface must travel smoothly through intermediate positions, not jump to its destination');
+          assert.ok(positions.size > 3, `The native surface must travel through intermediate positions: click=${click}, positions=${[...positions].join(',')}`);
         }
         for (const frame of frames) {
           assert.equal(frame.same, true); assert.equal(frame.visible, 'visible');

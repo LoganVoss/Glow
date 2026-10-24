@@ -2,7 +2,7 @@
 
 ## Supported source
 
-The reviewed sources are **26.1016.51333 (21161)**, **26.1013.40934 (20770)**, **26.1013.31256 (20586)**, **26.1007.71326 (20398)**, **26.1007.30912 (20156)**, and **26.1007.21159 (20052)**, macOS arm64, with the expected original archive, stylesheet, renderer assets, and signing state. A different version or changed source must fail verification. Do not bypass a failed check by replacing a hash or version number.
+The reviewed sources are **26.1021.31345 (21828)**, **26.1016.51333 (21161)**, **26.1013.40934 (20770)**, **26.1013.31256 (20586)**, **26.1007.71326 (20398)**, **26.1007.30912 (20156)**, and **26.1007.21159 (20052)**, macOS arm64, with the expected original archive, stylesheet, renderer assets, and signing state. A different version or changed source must fail verification. Do not bypass a failed check by replacing a hash or version number.
 
 Exact source metadata lives in `scripts/source-pins.json`. The builder selects the installed app version, then prefers `.local/originals/<version>-<build>/ChatGPT.app`. It uses the legacy `.local/original/ChatGPT.app` only when its version and build match; otherwise it reads `/Applications/ChatGPT.app`. Explicit `--source` selection still requires the installed baseline to be the same version when building. A stale original cannot cause a downgrade. If the installed app is already patched, supply a separately preserved, unmodified copy explicitly:
 
@@ -23,7 +23,7 @@ The certificate mode preserves hardened runtime, library validation, and Electro
 
 ### Persistent local signing
 
-Glow 0.10.10 provides explicit `--local-signing`. It creates a private self-signed code-signing identity automatically and reuses it across builds. No Apple certificate, paid membership, or publisher signature is required. The identity stays in `~/Library/Application Support/Glow/Signing`, outside the checkout; retain it and never upload its files. A new app version can be rebuilt locally once its integration has been reviewed.
+Glow 0.10.11 provides explicit `--local-signing`. It creates a private self-signed code-signing identity automatically and reuses it across builds. No Apple certificate, paid membership, or publisher signature is required. The identity stays in `~/Library/Application Support/Glow/Signing`, outside the checkout; retain it and never upload its files. A new app version can be rebuilt locally once its integration has been reviewed.
 
 ```sh
 "./Refresh Neon Codex.command" --local-signing --prepare-only

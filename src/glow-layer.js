@@ -3,7 +3,7 @@
 export const WORKSPACE_ROW_SELECTOR = '[data-app-shell-frame][data-app-shell-page-surface="true"] > [data-app-shell-workspace-row]';
 // Pinned to the reviewed native builds. This is the actual background surface,
 // already positioned by Codex's titlebar, navigation rail, gutters, and zoom.
-const NATIVE_SURFACE_SELECTOR = ':scope > :is(._PageSurface_yl8z4_2, ._PageSurface_etoz9_2)';
+const NATIVE_SURFACE_SELECTOR = ':scope > :is(._PageSurface_yl8z4_2, ._PageSurface_etoz9_2, ._PageSurface_azz1c_2)';
 const px = value => `${Math.round(value * 1000) / 1000}px`;
 
 export function createGlowLayer(win, { makeOverlay, applyOverlay, getTheme }) {

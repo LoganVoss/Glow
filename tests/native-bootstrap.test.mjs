@@ -6,11 +6,15 @@ import path from 'node:path';
 import { extractFile, listPackage } from '@electron/asar';
 import { chromium } from 'playwright';
 import { patchSidebarCycle, SIDEBAR_VARIANTS } from '../scripts/sidebar-cycle-patch.mjs';
+import { discoverRendererLayout, importPaths } from '../scripts/renderer-layout.mjs';
 
 // Opt-in, read-only verification of a locally prepared app archive. No vendor
 // code is checked in or written to disk. Only webview assets are served to a
 // fresh browser; native bridges, account data and external network are absent.
 // This proves module startup, not a successful native sign-in or conversation.
+// In the split renderer, index/main launch host services immediately. Test the
+// actual initial + primary module graph with an isolated entry instead, and
+// separately require the native launchers to remain byte-for-byte unchanged.
 const archive = process.env.NEON_TEST_APP_ASAR;
 const originalArchive = process.env.NEON_TEST_ORIGINAL_ASAR;
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
@@ -19,7 +23,7 @@ const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css
 const FAILURE = 'Glow bootstrap failure intentionally injected by its isolated test';
 const MARKER = '__glowNativeBootstrapCompleted';
 
-test('prepared native renderer starts independently of the optional Glow entry', {
+test('prepared native renderer modules evaluate independently of the optional Glow entry', {
   skip: !archive && 'Set NEON_TEST_APP_ASAR to a prepared app.asar to run this read-only test',
   timeout: 60_000,
 }, async t => {
@@ -29,44 +33,56 @@ test('prepared native renderer starts independently of the optional Glow entry',
   assert.ok(html.includes('./assets/neon-codex.js'), 'Test a Glow-patched archive');
   assert.doesNotMatch(html.match(/<html\b[^>]*>/i)?.[0] || '', /data-codex-window-type=/,
     'Exercise the real initial state before Codex establishes its window type');
-  const entries = [...html.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/gi)]
-    .map(match => path.posix.normalize(`webview/${match[1]}`))
-    .filter(file => /^webview\/assets\/index-[\w-]+\.js$/.test(file));
-  assert.equal(entries.length, 1, 'Expected one reviewed native entry module');
   const packageFiles = listPackage(archive).map(file => file.replace(/^\//, ''));
-  const initial = packageFiles.filter(file => /^webview\/assets\/app-initial-[\w-]+\.js$/.test(file));
-  assert.equal(initial.length, 1, 'Expected one reviewed native initial renderer');
-  const bootstrapFiles = [...initial, ...entries];
-  const initialSource = extractFile(archive, initial[0]).toString();
-  assert.doesNotMatch(initialSource, /import\s*\{[^}]*startNeonCodex[^}]*\}\s*from\s*["']\.\/neon-codex\.js["']/,
-    'Native startup must not statically depend on optional Glow initialization');
-  const settingsImports = [...initialSource.matchAll(/import\(`(\.\/settings-page-[\w-]+\.js)`\)/g)];
-  assert.equal(settingsImports.length, 1, 'Expected one reviewed native Settings lazy import');
-  const settingsFile = path.posix.normalize(`webview/assets/${settingsImports[0][1]}`);
+  const read = file => extractFile(archive, file).toString();
+  const glowTag = '<script type="module" src="./assets/neon-codex.js"></script>';
+  assert.equal(html.split(glowTag).length - 1, 1, 'Expected exactly one independent Glow entry');
+  const layout = discoverRendererLayout({ files: packageFiles,
+    readFile: file => extractFile(archive, file), html: html.replace(glowTag, '') });
+  const split = Boolean(layout.primaryPath);
+  const bootstrapFiles = split ? [layout.initialPath, layout.primaryPath] : [layout.initialPath, layout.entryPath];
+  const linked = (source, pattern, { dynamic = false } = {}) => {
+    const paths = importPaths(source, { dynamic }).map(file => path.posix.normalize(`webview/assets/${file}`)).filter(file => pattern.test(file));
+    assert.equal(paths.length, 1, 'Expected one linked native Settings module');
+    assert.ok(packageFiles.includes(paths[0]), 'Linked native Settings module exists');
+    return paths[0];
+  };
+  const settingsLoader = split ? linked(read(layout.runtimePath), /^webview\/assets\/settings-page-lazy-[a-f0-9]+\.js$/) : layout.initialPath;
+  const settingsFile = linked(read(settingsLoader), /^webview\/assets\/settings-page-[a-f0-9]+\.js$/, { dynamic: true });
+  const sidebarSource = read(layout.sidebarPath);
   const settingsSource = extractFile(archive, settingsFile).toString();
   const appearanceFiles = packageFiles.filter(file => /^webview\/assets\/appearance-settings-[\w-]+\.js$/.test(file));
   assert.equal(appearanceFiles.length, 1, 'Expected one patched native Appearance module');
   const appearanceFile = appearanceFiles[0];
   const bridgeCount = SIDEBAR_VARIANTS.reduce((total, variant) =>
-    total + initialSource.split(variant.bridge).length - 1, 0);
+    total + sidebarSource.split(variant.bridge).length - 1, 0);
   assert.equal(bridgeCount, 1, 'The native command must contain exactly one reviewed optional bridge');
   const matchingHooks = SIDEBAR_VARIANTS.reduce((total, variant) =>
-    total + initialSource.split(patchSidebarCycle(variant.hook)).length - 1, 0);
+    total + sidebarSource.split(patchSidebarCycle(variant.hook)).length - 1, 0);
   assert.equal(matchingHooks, 1, 'The native command must match one complete reviewed patched hook');
   assert.doesNotMatch(settingsSource, /__neon(?:Rail|Settings)|data-neon-rail|data-neon-settings-(?:home|navigation|loading)/,
     'Native Settings stays untouched; optional Home belongs to the independent Glow runtime');
-  for (const source of [initialSource, settingsSource]) {
+  const nativeFiles = [...new Set([layout.entryPath, layout.initialPath, layout.mainPath,
+    layout.runtimePath, layout.primaryPath, settingsLoader, settingsFile].filter(Boolean))];
+  for (const file of nativeFiles) {
+    const source = read(file);
     assert.doesNotMatch(source, /(?:import|from)\s*[(]?\s*["'`]\.\/(?:neon-codex|sidebar-cycle)\.js/,
       'Native navigation must not statically depend on optional Glow initialization');
   }
   if (originalArchive) {
     assert.ok(path.isAbsolute(originalArchive) && existsSync(originalArchive), 'Original archive must exist at an absolute path');
-    assert.equal(initialSource, patchSidebarCycle(extractFile(originalArchive, initial[0]).toString()),
-      'Native initial renderer changes must be exactly the reviewed optional command bridge');
-    assert.deepEqual(extractFile(archive, settingsFile), extractFile(originalArchive, settingsFile),
-      'Native Settings must remain byte-for-byte identical to the preserved original');
+    assert.equal(sidebarSource, patchSidebarCycle(extractFile(originalArchive, layout.sidebarPath).toString()),
+      'Native sidebar renderer changes must be exactly the reviewed optional command bridge');
+    for (const file of nativeFiles.filter(file => file !== layout.sidebarPath)) {
+      assert.deepEqual(extractFile(archive, file), extractFile(originalArchive, file),
+        `Native launcher, initial renderer and Settings modules must remain byte-for-byte identical: ${file}`);
+    }
   }
   const observed = new Set([...bootstrapFiles, settingsFile, appearanceFile]);
+  const harnessPath = 'webview/assets/__glow-isolated-bootstrap.js';
+  const entryAttribute = `src="./${layout.entryPath.slice('webview/'.length)}"`;
+  if (split) assert.equal(html.split(entryAttribute).length - 1, 1, 'Native entry replacement is exact and unique');
+  const harness = split ? Buffer.from(bootstrapFiles.map(file => `await import("./${path.posix.basename(file)}");`).join('\n')) : null;
 
   const server = createServer((request, response) => {
     try {
@@ -79,7 +95,11 @@ test('prepared native renderer starts independently of the optional Glow entry',
       if (file === 'webview/assets/neon-codex.js' && mode === 'missing') {
         response.writeHead(404); response.end(); return;
       }
-      let content = extractFile(archive, file);
+      let content = split && file === harnessPath ? harness : extractFile(archive, file);
+      if (split && file === 'webview/index.html') {
+        // This is an explicitly isolated module test, not native launcher execution.
+        content = Buffer.from(html.replace(entryAttribute, 'src="./assets/__glow-isolated-bootstrap.js"'));
+      }
       if (file === 'webview/assets/neon-codex.js' && mode === 'throws') {
         // Keep its export shape so failure occurs during evaluation, matching
         // the 0.10.0 startup regression rather than an unrelated link error.
@@ -100,7 +120,7 @@ test('prepared native renderer starts independently of the optional Glow entry',
   try {
     browser = await chromium.launch({ headless: true, chromiumSandbox: true,
       executablePath: process.env.NEON_TEST_BROWSER || (existsSync(chrome) ? chrome : undefined) });
-    for (const mode of ['normal', 'throws', 'missing']) await t.test(`native modules finish with ${mode} Glow entry`, async () => {
+    for (const mode of ['normal', 'throws', 'missing']) await t.test(`${split ? 'isolated initial/primary' : 'native initial/entry'} modules finish with ${mode} Glow entry`, async () => {
       const context = await browser.newContext({ serviceWorkers: 'block' });
       try {
         await context.route('**/*', route => {
@@ -118,7 +138,7 @@ test('prepared native renderer starts independently of the optional Glow entry',
         // Allow pending exception delivery after both modules have evaluated.
         await page.waitForTimeout(100);
         assert.deepEqual(await page.evaluate(marker => globalThis[marker], MARKER), bootstrapFiles,
-          'Both real native modules complete in dependency order');
+          'The actual native modules under test complete in dependency order');
         assert.deepEqual(errors, mode === 'throws' ? [FAILURE] : [],
           'Optional Glow failure must not produce native dependency errors');
         assert.deepEqual(failedAssets, mode === 'missing' ? [`/${mode}/webview/assets/neon-codex.js`] : []);

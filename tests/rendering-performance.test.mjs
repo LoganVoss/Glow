@@ -34,7 +34,7 @@ test('Glow renderer sleeps without repaints and preserves its geometry and clock
     await page.setContent(`<html data-codex-window-type="electron"><head><link rel="stylesheet" href="${origin}/src/glow.css"></head>
       <body style="margin:0"><div data-app-shell-frame data-app-shell-page-surface="true">
       <div data-app-shell-workspace-row style="position:fixed;inset:0">
-      <div class="_PageSurface_etoz9_2" style="position:absolute;inset:56px 8px 8px 64px;border-radius:16px"></div>
+      <div class="_PageSurface_azz1c_2" style="position:absolute;inset:56px 8px 8px 64px;border-radius:16px"></div>
       </div></div></body></html>`);
     await page.evaluate(async origin => {
       const { createGlowLayer } = await import(origin + '/src/glow-layer.js');
@@ -60,10 +60,10 @@ test('Glow renderer sleeps without repaints and preserves its geometry and clock
       });
       assert.equal(writes, 0, 'Idempotent anchor state and style setters avoid redundant observer work');
       const positions = await page.evaluate(async () => {
-        document.querySelector('._PageSurface_etoz9_2').style.left = '80px';
+        document.querySelector('._PageSurface_azz1c_2').style.left = '80px';
         window.layer.reconcile();
         return [window.layer.getFrame().getBoundingClientRect().left,
-          document.querySelector('._PageSurface_etoz9_2').getBoundingClientRect().left];
+          document.querySelector('._PageSurface_azz1c_2').getBoundingClientRect().left];
       });
       assert.deepEqual(positions, [80, 80], 'Real geometry changes still align immediately');
     });
@@ -107,7 +107,7 @@ test('Glow renderer sleeps without repaints and preserves its geometry and clock
 
     await t.test('utility suspension releases a removed surface even while its shell stays connected', async () => {
       await page.evaluate(async () => {
-        const surface = document.querySelector('._PageSurface_etoz9_2');
+        const surface = document.querySelector('._PageSurface_azz1c_2');
         window.detachedSurface = new WeakRef(surface);
         document.documentElement.dataset.codexWindowType = 'utility';
         surface.remove(); window.layer.reconcile();
@@ -121,7 +121,7 @@ test('Glow renderer sleeps without repaints and preserves its geometry and clock
       assert.equal(await page.evaluate(() => window.detachedSurface.deref() === undefined), true);
       assert.equal(await page.locator(FRAME).evaluate(frame => getComputedStyle(frame).visibility), 'hidden');
       await page.evaluate(() => {
-        const surface = document.createElement('div'); surface.className = '_PageSurface_etoz9_2';
+        const surface = document.createElement('div'); surface.className = '_PageSurface_azz1c_2';
         surface.style.cssText = 'position:absolute;inset:56px 8px 8px 80px;border-radius:16px';
         document.querySelector('[data-app-shell-workspace-row]').append(surface);
         document.documentElement.dataset.codexWindowType = 'electron'; window.layer.reconcile();

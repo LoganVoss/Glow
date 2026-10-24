@@ -9,6 +9,7 @@ export const APPEARANCE_VARIANTS = Object.freeze([
   Object.freeze({ id: '20052-20398', jsx: 'Agn', jsxAlias: 't', react: 'PCn', reactAlias: 'r', cache: 'NCn', cacheAlias: 'n', scopeHook: 'Fan', scope: 'H0t', settings: 'p3t', write: 'wjt', mountNeedle: APPEARANCE_NEEDLE }),
   Object.freeze({ id: '20586', jsx: 'xMt', jsxAlias: 'n', react: 'yzt', reactAlias: 'r', cache: 'vzt', cacheAlias: 't', scopeHook: 'Ixt', scope: 'Cot', settings: '_lt', write: 'qnt', mountNeedle: APPEARANCE_NEEDLE }),
   Object.freeze({ id: '21161', jsx: 'LNt', jsxAlias: 'n', react: 'FBt', reactAlias: 't', cache: 'PBt', cacheAlias: 'r', scopeHook: '$St', scope: 'Qst', settings: 'xut', write: 'lit', mountNeedle: '(0,h.jsx)(u,{defaultAdvancedExpanded:o},r)' }),
+  Object.freeze({ id: '21828', jsx: 'YNt', jsxAlias: 'n', react: 'XVt', reactAlias: 't', cache: 'YVt', cacheAlias: 'r', scopeHook: 'rCt', scope: 'Bst', settings: 'put', write: 'Hit', mountNeedle: APPEARANCE_NEEDLE }),
 ]);
 
 const count = (source, needle) => source.split(needle).length - 1;

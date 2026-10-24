@@ -27,6 +27,15 @@ function fixture(variant = SIDEBAR_VARIANTS[0], appearance = APPEARANCE_VARIANTS
 function inspect(f, pins = {}) {
   return inspectStructure({ ...f, files: [...f.assets.keys()], readFile: file => Buffer.from(f.assets.get(file)), pins });
 }
+function splitFixture() {
+  const f=fixture(SIDEBAR_VARIANTS.at(-1),APPEARANCE_VARIANTS.at(-1));
+  f.assets.set('webview/assets/app-primary-a1.js',f.assets.get('webview/assets/app-initial-a1.js'));
+  f.assets.set('webview/assets/app-initial-a1.js','export const nativeState = {};');
+  f.assets.set('webview/assets/entry-a1.js','import("./app-main-a1.js");');
+  f.assets.set('webview/assets/app-main-a1.js','import "./app-initial-a1.js";import("./app-runtime-a1.js");');
+  f.assets.set('webview/assets/app-runtime-a1.js','import{state as nativeState}from"./app-primary-a1.js";');
+  return f;
+}
 function change(f, role, from, to) {
   const key = [...f.assets.keys()].find(key => key.includes(role));
   assert.ok(f.assets.get(key).includes(from));
@@ -76,7 +85,7 @@ test('native sidebar command structural changes and unlinked renderer are refuse
   f = fixture(); change(f, 'app-initial-', 'animate:t', 'animate:!1');
   reject(f, /reviewed native sidebar command callback/);
   f = fixture(); change(f, 'entry-a1', 'app-initial-a1.js', 'other-a1.js');
-  reject(f, /linked native initial renderer/);
+  reject(f, /native main renderer import/);
 });
 test('known build rejects changes to native initial renderer even when hook still matches', () => {
   const f=fixture(), proposal=inspect(f).candidateSourcePin;
@@ -151,10 +160,66 @@ test('latest Appearance bindings require matching bridge and native writer befor
 
 test('latest Appearance bindings cannot use an older mount or React initializer', () => {
   const latest=APPEARANCE_VARIANTS.at(-1);
+  const otherMount=APPEARANCE_VARIANTS.find(variant=>variant.mountNeedle!==latest.mountNeedle).mountNeedle;
   let f=fixture(SIDEBAR_VARIANTS.at(-1),latest);
-  change(f,'appearance-settings',latest.mountNeedle,APPEARANCE_NEEDLE);
+  change(f,'appearance-settings',latest.mountNeedle,otherMount);
   reject(f,/exactly one native Appearance mount/);
   f=fixture(SIDEBAR_VARIANTS.at(-1),latest);
   change(f,'appearance-settings',`m=${latest.reactAlias}()`,'m=other()');
   reject(f,/React\/JSX\/cache initialization changed/);
+});
+
+test('split renderer pins both initial and primary through the actual native import chain',()=>{
+  const f=splitFixture(), before=JSON.stringify([...f.assets]);
+  const result=inspect(f);
+  assert.equal(result.status,'compatible-candidate',result.reason);
+  const proposal=result.candidateSourcePin;
+  assert.equal(proposal.value.initialRenderer,'webview/assets/app-initial-a1.js');
+  assert.equal(proposal.value.primaryRenderer,'webview/assets/app-primary-a1.js');
+  assert.equal(proposal.value.primaryRendererHash,sha(f.assets.get(proposal.value.primaryRenderer)));
+  assert.equal(inspect(f,{[proposal.key]:proposal.value}).status,'compatible-known');
+  assert.equal(JSON.stringify([...f.assets]),before,'inspection must not mutate native modules');
+  for(const role of ['initialRenderer','primaryRenderer']){
+    const changed=splitFixture();
+    changed.assets.set(proposal.value[role],changed.assets.get(proposal.value[role])+'/* changed */');
+    rejectKnown(changed,proposal,new RegExp(`${role}Hash`));
+  }
+  function rejectKnown(changed,proposal,reason){
+    const result=inspect(changed,{[proposal.key]:proposal.value});
+    assert.equal(result.status,'unsupported');assert.match(result.reason,reason);
+  }
+});
+test('split renderer refuses preload catalogs in place of real import edges',()=>{
+  for(const [file,original,replacement] of [
+    ['entry-a1.js','import("./app-main-a1.js")','const deps=["./app-main-a1.js"]'],
+    ['app-main-a1.js','import("./app-runtime-a1.js")','const deps=["./app-runtime-a1.js"]'],
+    ['app-runtime-a1.js','import{state as nativeState}from"./app-primary-a1.js"','const deps=["./app-primary-a1.js"]'],
+  ]){
+    const f=splitFixture();change(f,file,original,replacement);
+    reject(f,/native (?:main|runtime|primary) renderer|reviewed native sidebar/);
+  }
+});
+test('split renderer refuses missing, duplicate, unlinked, or unreviewed primary modules',()=>{
+  let f=splitFixture();f.assets.delete('webview/assets/app-primary-a1.js');reject(f,/native primary renderer/);
+  f=splitFixture();f.assets.set('webview/assets/app-primary-a2.js',SIDEBAR_VARIANTS.at(-1).hook);reject(f,/exactly one native primary renderer/);
+  f=splitFixture();change(f,'app-runtime-a1.js','app-primary-a1.js','app-primary-a2.js');reject(f,/Missing renderer asset/);
+  f=splitFixture();f.assets.set('webview/assets/app-primary-a1.js','export const state = {};');reject(f,/reviewed native sidebar/);
+});
+test('builder and inspector share split-renderer discovery',()=>{
+  for(const file of ['build.mjs','compatibility.mjs']){
+    const source=fs.readFileSync(new URL(`../scripts/${file}`,import.meta.url),'utf8');
+    assert.ok(source.includes("import { discoverRendererLayout } from './renderer-layout.mjs';"));
+    assert.ok(source.includes('const layout = discoverRendererLayout('));
+  }
+});
+
+test('legacy main imports keep patching initial even when an unrelated primary asset exists',()=>{
+  const f=fixture();
+  f.assets.set('webview/assets/entry-a1.js','import("./app-main-a1.js");');
+  f.assets.set('webview/assets/app-main-a1.js','import "./app-initial-a1.js";');
+  f.assets.set('webview/assets/app-primary-a1.js','import "./app-initial-a1.js";');
+  const result=inspect(f);
+  assert.equal(result.status,'compatible-candidate',result.reason);
+  assert.equal(result.candidateSourcePin.value.primaryRenderer,undefined);
+  assert.equal(result.candidateSourcePin.value.initialRenderer,'webview/assets/app-initial-a1.js');
 });

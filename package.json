@@ -1,6 +1,6 @@
 {
   "name": "neon-codex-local-theme",
-  "version": "0.10.10",
+  "version": "0.10.11",
   "private": true,
   "type": "module",
   "description": "Unofficial local macOS appearance patch for Codex with persistent local signing; no Apple Developer certificate required.",

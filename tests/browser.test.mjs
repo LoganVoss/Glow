@@ -812,7 +812,7 @@ test('Glow: balanced color controls, fluid palettes, and native lifecycle', { ti
       assert.equal(saved.profiles.dark.gloss, .67);
     });
 
-    for (const surfaceClass of ['_PageSurface_etoz9_2', '_PageSurface_yl8z4_2']) {
+    for (const surfaceClass of ['_PageSurface_azz1c_2', '_PageSurface_etoz9_2', '_PageSurface_yl8z4_2']) {
       await t.test(`reviewed surface ${surfaceClass} follows native zoom/corners and ignores nested or unknown surfaces`, async () => {
         const geometryPage = await context.newPage();
         try {

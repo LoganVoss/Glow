@@ -16,6 +16,7 @@ import assert from 'node:assert/strict';
 import { withLocalIdentity } from './local-identity.mjs';
 import { patchSidebarCycle } from './sidebar-cycle-patch.mjs';
 import { patchAppearance } from './appearance-patch.mjs';
+import { discoverRendererLayout } from './renderer-layout.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.dirname(HERE);
@@ -272,6 +273,11 @@ function patchAssets(asar, archive, originalCSS) {
   assert.equal(sha(asar.extractFile(archive, PIN.settingsBridge)), PIN.settingsBridgeHash, 'Native settings bridge differs from the reviewed original');
   assert.equal(sha(asar.extractFile(archive, PIN.generalSettings)), PIN.generalSettingsHash, 'Native appearance control differs from the reviewed original');
   const html = originalHTML.toString();
+  const layout = discoverRendererLayout({ files: asar.listPackage(archive), readFile: file => asar.extractFile(archive, file), html });
+  assert.equal(layout.initialPath, PIN.initialRenderer, 'Native initial renderer linkage differs from the reviewed original');
+  assert.equal(layout.primaryPath, PIN.primaryRenderer, 'Native primary renderer linkage differs from the reviewed original');
+  const originalSidebar = asar.extractFile(archive, layout.sidebarPath);
+  assert.equal(sha(originalSidebar), PIN.primaryRendererHash ?? PIN.initialRendererHash, 'Native sidebar renderer differs from the reviewed original');
   assert.equal(html.split('</head>').length - 1, 1, 'Expected one closing head element');
   const scriptTag = '    <script type="module" src="./assets/neon-codex.js"></script>\n';
   const firstModule = html.match(/^[ \t]*<script\s+type="module"[^>]*><\/script>/m);
@@ -289,13 +295,13 @@ function patchAssets(asar, archive, originalCSS) {
     bridgePath: PIN.settingsBridge, generalPath: PIN.generalSettings,
   });
   run(process.execPath, ['--input-type=module', '--check'], { input: patchedAppearance });
-  const patchedInitial = patchSidebarCycle(originalInitial.toString());
-  run(process.execPath, ['--input-type=module', '--check'], { input: patchedInitial });
+  const patchedSidebar = patchSidebarCycle(originalSidebar.toString());
+  run(process.execPath, ['--input-type=module', '--check'], { input: patchedSidebar });
   const replacements = new Map([
     [PIN.css, Buffer.concat([originalCSS, Buffer.from(MARKER), assets['src/glow.css'], Buffer.from('\n'), assets['src/settings.css'], Buffer.from('\n'), assets['src/theme-transition.css'], Buffer.from('\n'), assets['src/sidebar-cycle.css'], Buffer.from('\n/* NEON CODEX LOCAL THEME — END */\n')])],
     [PIN.html, Buffer.from(patchedHTML)],
     [PIN.appearance, Buffer.from(patchedAppearance)],
-    [PIN.initialRenderer, Buffer.from(patchedInitial)],
+    [layout.sidebarPath, Buffer.from(patchedSidebar)],
     ['webview/assets/neon-codex.js', assets['src/neon-codex.js']],
     ['webview/assets/preferences.js', assets['src/preferences.js']],
     ['webview/assets/glow-layer.js', assets['src/glow-layer.js']],

@@ -7,6 +7,7 @@ import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { patchSidebarCycle } from './sidebar-cycle-patch.mjs';
 import { patchAppearance } from './appearance-patch.mjs';
+import { discoverRendererLayout } from './renderer-layout.mjs';
 export { APPEARANCE_NEEDLE } from './appearance-patch.mjs';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -59,11 +60,8 @@ export function inspectStructure({ files, readFile, info, headerHash, frameworkB
     const htmlPath = one(names.filter(file => file === 'webview/index.html'), 'renderer HTML');
     const html = read(htmlPath);
     requireCheck(!html.includes('neon-codex'), 'Renderer is already patched; inspect the matching preserved original');
-    const entryMatches = [...html.matchAll(/<script\s+type="module"[^>]*\bsrc="(\.\/assets\/[^"/]+\.js)"/g)];
-    const entryPath = path.posix.normalize(`webview/${one(entryMatches, 'native entry module')[1]}`);
-    const entry = read(entryPath);
-    const initialPath = one(names.filter(file => /^webview\/assets\/app-initial-[a-f0-9]+\.js$/.test(file) && entry.includes(path.posix.basename(file))), 'linked native initial renderer');
-    const initial = read(initialPath);
+    const layout = discoverRendererLayout({ files: names, readFile, html });
+    const initialPath = layout.initialPath;
     const cssPath = one(names.filter(file => /^webview\/assets\/app-shared-[a-f0-9]+\.css$/.test(file) && html.includes(path.posix.basename(file))), 'referenced shared stylesheet');
     const appearancePath = one(names.filter(file => /^webview\/assets\/appearance-settings-[a-f0-9]+\.js$/.test(file)), 'Appearance component');
     const appearance = read(appearancePath);
@@ -72,7 +70,7 @@ export function inspectStructure({ files, readFile, info, headerHash, frameworkB
     const generalImport = one(appearanceImports.filter(item => /^webview\/assets\/general-settings-[a-f0-9]+\.js$/.test(item.file)), 'native general settings import');
     const bridgePath = bridgeImport.file, generalPath = generalImport.file;
     const css = read(cssPath), bridge = read(bridgePath), general = read(generalPath);
-    for (const [role, file] of Object.entries({ html: htmlPath, css: cssPath, appearance: appearancePath, settingsBridge: bridgePath, generalSettings: generalPath, initialRenderer: initialPath })) {
+    for (const [role, file] of Object.entries({ html: htmlPath, css: cssPath, appearance: appearancePath, settingsBridge: bridgePath, generalSettings: generalPath, initialRenderer: initialPath, ...(layout.primaryPath ? { primaryRenderer: layout.primaryPath } : {}) })) {
       const bytes = readFile(file); report.assets[role] = { path: file, bytes: bytes.length, sha256: sha(bytes) };
     }
     evidence('asset-discovery', 'Unambiguous hashed assets, linked through the renderer and Appearance imports');
@@ -90,8 +88,8 @@ export function inspectStructure({ files, readFile, info, headerHash, frameworkB
     catch { fail('Transformed Appearance module does not parse'); }
     evidence('appearance-transform', 'Reviewed native mount and React/JSX bindings, unchanged CSP, and transformed module syntax');
     evidence('settings-bridge', 'Reviewed exports and the native scoped non-optimistic theme writer are present');
-    const patchedInitial = patchSidebarCycle(initial);
-    try { execFileSync(process.execPath, ['--input-type=module', '--check'], { input: patchedInitial, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }); }
+    const patchedSidebar = patchSidebarCycle(read(layout.sidebarPath));
+    try { execFileSync(process.execPath, ['--input-type=module', '--check'], { input: patchedSidebar, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }); }
     catch { fail('Transformed native sidebar command does not parse'); }
     evidence('sidebar-command', 'Reviewed titlebar/menu command has a fail-open optional bridge, unchanged native fallback, and no new imports');
     const integrity = info.ElectronAsarIntegrity;
@@ -99,8 +97,11 @@ export function inspectStructure({ files, readFile, info, headerHash, frameworkB
     checkFramework(frameworkBytes, integrity);
     evidence('electron-integrity', 'ASAR header, framework digest, and reviewed fuse settings agree');
     const candidate = { bundle: info.CFBundleIdentifier, version, build, header: headerHash, css: cssPath, cssHash: report.assets.css.sha256, framework: FRAMEWORK, fuse: FUSE, html: htmlPath, htmlHash: report.assets.html.sha256, appearance: appearancePath, appearanceHash: report.assets.appearance.sha256, settingsBridge: bridgePath, settingsBridgeHash: report.assets.settingsBridge.sha256, generalSettings: generalPath, generalSettingsHash: report.assets.generalSettings.sha256, initialRenderer: initialPath, initialRendererHash: report.assets.initialRenderer.sha256 };
+    if (layout.primaryPath) Object.assign(candidate, { primaryRenderer: layout.primaryPath, primaryRendererHash: report.assets.primaryRenderer.sha256 });
     const known = pins[`${version}:${build}`];
     if (known) {
+      requireCheck(known.primaryRenderer === candidate.primaryRenderer, 'Reviewed source pin mismatch: primaryRenderer');
+      requireCheck(known.primaryRendererHash === candidate.primaryRendererHash, 'Reviewed source pin mismatch: primaryRendererHash');
       for (const [key, value] of Object.entries(candidate)) requireCheck(known[key] === value, `Reviewed source pin mismatch: ${key}`);
       report.status = 'compatible-known';
       evidence('reviewed-source-pin', 'All discovered paths, asset hashes, framework settings, and archive header match the reviewed build');

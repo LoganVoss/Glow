@@ -1,8 +1,12 @@
-# Glow 0.10.10 — App update compatibility
+# Glow 0.10.11 — App update compatibility
 
-Restores Glow support for **Codex/ChatGPT 26.1016.51333 (21161)**. Created by **Logan Voss + Astra 6 Ultra**.
+Restores Glow support for **Codex/ChatGPT 26.1021.31345 (21828)**. Created by **Logan Voss + Astra 6 Ultra**.
 
-This update adapts Glow to the app's renamed Appearance and sidebar controls. The integration was reviewed against the actual OpenAI-signed build, with explicit checks for each supported version. Glow's design, saved preferences, and memory and idle-rendering fixes remain unchanged.
+- Adapts Appearance and the sidebar toggle to the app's new module layout.
+- Restores the border and smooth sidebar transitions on the renamed window surface.
+- Preserves your colors, settings, and the existing memory and idle-rendering fixes.
+
+The installer verifies the actual native import chain and keeps Glow independent of native startup. Earlier supported app builds remain compatible.
 
 ## Refresh
 
@@ -10,6 +14,6 @@ Update your existing clean checkout with `git pull --ff-only`, preserving local 
 
 [Install](https://github.com/LoganVoss/Glow#install-with-one-prompt) · [Refresh instructions](https://github.com/LoganVoss/Glow/blob/main/docs/install.md#after-an-app-update) · [Verification](https://github.com/LoganVoss/Glow/blob/main/docs/verification.md) · [Demo](https://www.youtube.com/watch?v=H-9Ug0_luwg)
 
-**Native post-install testing remains required.** This is an experimental, source-only prerelease for Apple silicon macOS. Local signing adds an app-scoped library-validation exception and removes vendor team-bound capabilities; the result is not notarized. No OpenAI app bundle, account data, or signing material is distributed.
+**Native post-install testing remains required.** The new module checks run in an isolated browser; they do not launch the native app or exercise its account services. This is an experimental, source-only prerelease for Apple silicon macOS. Local signing adds an app-scoped library-validation exception and removes vendor team-bound capabilities; the result is not notarized. No OpenAI app bundle, account data, or signing material is distributed.
 
 Original code is MIT licensed; third-party marks and artwork retain their respective terms.

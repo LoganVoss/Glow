@@ -1,6 +1,6 @@
 # Working with Glow
 
-Read `README.md` and `docs/install.md` for installation requests. Version 0.10.10 provides explicit `--local-signing` with a persistent identity generated on the user’s Mac; no Apple-issued certificate or membership is required. It remains experimental. Read docs/verification.md for the actual scope of testing. A browser-only chat cannot build on the user’s Mac.
+Read `README.md` and `docs/install.md` for installation requests. Version 0.10.11 provides explicit `--local-signing` with a persistent identity generated on the user’s Mac; no Apple-issued certificate or membership is required. It remains experimental. Read docs/verification.md for the actual scope of testing. A browser-only chat cannot build on the user’s Mac.
 
 - Preserve existing source edits and `.local/` originals, staging, reports, and recovery data. Never commit or upload that directory, app bundles, account data, or signing material.
 - For installation requested inside Codex/ChatGPT, run Refresh with `--prepare-only` and the chosen signing mode. In no-certificate mode use `"./Refresh Neon Codex.command" --local-signing --prepare-only`. Verify the build and installation preflight, then give the exact absolute command with the same mode for a separate persistent Terminal window. Do not start the waiting installer from the app-hosted session or quit the host app.
