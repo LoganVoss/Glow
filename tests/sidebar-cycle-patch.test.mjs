@@ -9,6 +9,7 @@ const bindings = {
   '20586': { hook: 'EHa', memo: 'DHa', open: 'Hk', peek: 'FK', writer: 'vur', command: 'uj', ipc: 'go' },
   '21161': { hook: 'Rqa', memo: 'zqa', open: 'Gk', peek: 'fq', writer: 'zpr', command: 'yj', ipc: 'Li' },
   '21828': { hook: 'oAt', memo: 'sAt', open: 'q_', peek: 'xP', writer: 'M3e', command: 'vx', ipc: 'Ee' },
+  '22391': { hook: 'qAt', memo: 'JAt', open: 'RS', peek: 'hP', writer: 'xke', command: 'VT', ipc: 'wf' },
 };
 function harness(variant, runtime, { open=true, enabled=true, peek=false, animate=true }={}) {
   const calls=[], handlers={}, state={open}, cache=Array(8).fill(Symbol('unset'));

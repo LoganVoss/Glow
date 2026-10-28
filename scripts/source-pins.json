@@ -140,5 +140,27 @@
     "initialRendererHash": "8f4e5fe65617413cabf689afbfc04bc6c24f73a5c0b57d7d0de443942343bd55",
     "primaryRenderer": "webview/assets/app-primary-7d7313419f84.js",
     "primaryRendererHash": "745529956e303674c268a6871e6f5aad49eca7ef5af899952bf0379d829821b6"
+  },
+  "26.1023.50603:22391": {
+    "bundle": "com.openai.codex",
+    "version": "26.1023.50603",
+    "build": "22391",
+    "header": "419fa3263d92edc3096e1ebf24a200f1d407de0253d284b92b2fd35101d8ea48",
+    "css": "webview/assets/app-shared-398c891a59df.css",
+    "cssHash": "fbeecf83dfe33c2780d527e361fde5003bbcca7dda660922a371aa6a11ce3497",
+    "framework": "Contents/Frameworks/Codex Framework.framework/Codex Framework",
+    "fuse": "010011001",
+    "html": "webview/index.html",
+    "htmlHash": "72b8ae1fbda07e561046c3f237d790274a99e4d4d1653ba9f9cb850c042eba49",
+    "appearance": "webview/assets/appearance-settings-14775ab23545.js",
+    "appearanceHash": "8d07160b33520879bc0cf6959a0a1c4c54ac2c6c3115cc555186302bec16c967",
+    "settingsBridge": "webview/assets/app-shared-2864d2ff2296.js",
+    "settingsBridgeHash": "f15485482923dd016959091f70166c9f0146d6a4f9d5474cd0b8be6c22603dae",
+    "generalSettings": "webview/assets/general-settings-d15616bc2e2f.js",
+    "generalSettingsHash": "7bbbf40ee95e539104568b6d435f8d06a9d16ffb918a1a999856e4ed3d66b74c",
+    "initialRenderer": "webview/assets/app-initial-b539f0af92f3.js",
+    "initialRendererHash": "96d8d335e8bd4612da5f0f370c6fc2bdee5fccdbbc269d6d6db7ae899e2aa81f",
+    "primaryRenderer": "webview/assets/app-primary-8a31c4436352.js",
+    "primaryRendererHash": "eef9f6e3e57b996e3a07f3e2015e786c9b8f41f6fe02758db15e4777ba4e573d"
   }
 }

@@ -2,11 +2,13 @@
 
 Glow can inspect an updated app without a signing certificate. The check reads the installed app, finds its actual renderer assets, and checks whether Glow’s native Appearance integration still fits. It never patches, signs, installs, launches, or changes preferences.
 
-Glow 0.10.11 checks the native Toggle Sidebar command and its complete titlebar/menu registration against explicit reviewed variants. Its optional callback falls back to native behavior when Glow is absent or fails. No Glow import is added to native startup, and native Settings modules remain unchanged. Review the rail, footer, panel geometry, and guarded Home destination when adapting a new build; hashes alone do not establish compatibility.
+Glow 0.10.12 checks the native Toggle Sidebar command and its complete titlebar/menu registration against explicit reviewed variants. Its optional callback falls back to native behavior when Glow is absent or fails. No Glow import is added to native startup, and native Settings modules remain unchanged. Review the rail, footer, panel geometry, and guarded Home destination when adapting a new build; hashes alone do not establish compatibility.
 
 Build **21828** separates the main window into an `app-primary` module. The inspector and builder follow its actual `entry → app-main → app-runtime → app-primary` import chain, pin both initial and primary renderers, and patch only the primary module's reviewed sidebar command. They also support its renamed Appearance bindings and page-surface class. Earlier reviewed builds retain their existing integrations. Unknown, mixed, ambiguous, or unlinked modules are refused.
 
-Glow 0.10.11 builds locally with a persistent identity it generates on your Mac. No Apple certificate or new publisher signature is required per update. Retain `~/Library/Application Support/Glow/Signing` and your checkout’s `.local/` recovery records.
+Build **22391** keeps the split renderer and existing page-surface geometry, but renames the Appearance bridge and sidebar command bindings. Its complete native mount, scoped theme writer, and sidebar hook are reviewed explicitly; unknown or mixed bindings remain refused.
+
+Glow 0.10.12 builds locally with a persistent identity it generates on your Mac. No Apple certificate or new publisher signature is required per update. Retain `~/Library/Application Support/Glow/Signing` and your checkout’s `.local/` recovery records.
 
 From the Glow repository, after `npm ci --ignore-scripts`:
 
