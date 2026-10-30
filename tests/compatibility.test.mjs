@@ -9,7 +9,7 @@ import { APPEARANCE_VARIANTS } from '../scripts/appearance-patch.mjs';
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
 function fixture(variant = SIDEBAR_VARIANTS[0], appearance = APPEARANCE_VARIANTS[0]) {
   const assets = new Map(Object.entries({
-    'webview/index.html': '<head><meta http-equiv="Content-Security-Policy" content="default-src \'self\'">\n<link href="./assets/app-shared-a1.css">\n<script type="module" src="./assets/entry-a1.js"></script>\n</head><body></body>',
+    'webview/index.html': '<head><meta http-equiv="Content-Security-Policy" content="default-src \'self\'">\n<link rel="stylesheet" href="./assets/app-shared-a1.css">\n<script type="module" src="./assets/entry-a1.js"></script>\n</head><body></body>',
     'webview/assets/app-shared-a1.css': ':root{color:black}',
     'webview/assets/appearance-settings-a1.js': `import{${appearance.jsx} as ${appearance.jsxAlias},${appearance.cache} as ${appearance.cacheAlias},${appearance.react} as ${appearance.reactAlias}}from"./app-shared-a1.js";import{n as u}from"./general-settings-a1.js";var m,h,p;m=${appearance.reactAlias}();h=${appearance.jsxAlias}();p=${appearance.cacheAlias}();function f(){const i=true,o=true;return ${appearance.mountNeedle}}`,
     'webview/assets/app-shared-a1.js': `export{a as ${appearance.scopeHook},b as ${appearance.scope},c as ${appearance.settings},d as ${appearance.write},e as ${appearance.jsx},f as ${appearance.react},g as ${appearance.cache}};`,
@@ -100,7 +100,7 @@ test('duplicate Appearance candidates are refused', () => {
 });
 test('ambiguous referenced shared stylesheets are refused', () => {
   const f = fixture();f.assets.set('webview/assets/app-shared-a2.css', 'body{}');
-  change(f, 'index.html', '</head>', '<link href="./assets/app-shared-a2.css"></head>');
+  change(f, 'index.html', '</head>', '<link rel="stylesheet" href="./assets/app-shared-a2.css"></head>');
   reject(f, /exactly one referenced shared stylesheet/);
 });
 test('unused unrelated general settings files do not cause false ambiguity', () => {
@@ -205,11 +205,70 @@ test('split renderer refuses missing, duplicate, unlinked, or unreviewed primary
   f=splitFixture();change(f,'app-runtime-a1.js','app-primary-a1.js','app-primary-a2.js');reject(f,/Missing renderer asset/);
   f=splitFixture();f.assets.set('webview/assets/app-primary-a1.js','export const state = {};');reject(f,/reviewed native sidebar/);
 });
-test('builder and inspector share split-renderer discovery',()=>{
+test('builder and inspector share renderer and stylesheet discovery',()=>{
   for(const file of ['build.mjs','compatibility.mjs']){
     const source=fs.readFileSync(new URL(`../scripts/${file}`,import.meta.url),'utf8');
-    assert.ok(source.includes("import { discoverRendererLayout } from './renderer-layout.mjs';"));
+    assert.ok(source.includes("import { discoverRendererLayout, discoverRendererStylesheet } from './renderer-layout.mjs';"));
     assert.ok(source.includes('const layout = discoverRendererLayout('));
+    assert.ok(source.includes('discoverRendererStylesheet({'));
+  }
+});
+
+test('hash-only stylesheet is selected through its real link and remains hash-pinned',()=>{
+  const f=splitFixture();
+  const css='webview/assets/5257da4ba4ae.css';
+  f.assets.set(css,f.assets.get('webview/assets/app-shared-a1.css'));
+  change(f,'index.html','app-shared-a1.css','5257da4ba4ae.css');
+  const result=inspect(f);
+  assert.equal(result.status,'compatible-candidate',result.reason);
+  assert.equal(result.assets.css.path,css);
+  const pin=result.candidateSourcePin;
+  assert.equal(inspect(f,{[pin.key]:pin.value}).status,'compatible-known');
+  f.assets.set(css,'body{color:red}');
+  assert.match(inspect(f,{[pin.key]:pin.value}).reason,/source pin mismatch: cssHash/);
+});
+test('stylesheet discovery refuses preload, comment, or incidental filename substitutes',()=>{
+  const link='<link rel="stylesheet" href="./assets/app-shared-a1.css">';
+  for(const replacement of [link.replace('stylesheet','preload'),`<!-- ${link} -->`,
+    '<script>const catalog="app-shared-a1.css";</script>',`<script>const example = '${link}';</script>`,
+    `<style>/* ${link} */</style>`,`<title>${link}</title>`,
+    `<link data-example=' rel="stylesheet" href="./assets/app-shared-a1.css"'>`,
+    `<meta data-example='${link}'>`]) {
+    const f=fixture();change(f,'index.html',link,replacement);
+    reject(f,/exactly one referenced shared stylesheet/);
+  }
+});
+test('stylesheet discovery refuses absent assets, ambiguous links, and duplicate attributes',()=>{
+  let f=fixture();f.assets.delete('webview/assets/app-shared-a1.css');
+  reject(f,/Missing referenced renderer stylesheet/);
+  f=fixture();change(f,'index.html','</head>','<link rel="stylesheet" href="./assets/a2.css"></head>');
+  reject(f,/exactly one referenced shared stylesheet/);
+  f=fixture();change(f,'index.html','href="./assets/app-shared-a1.css"','href="./assets/app-shared-a1.css" href="./assets/a2.css"');
+  reject(f,/Duplicate stylesheet link href/);
+  f=fixture();change(f,'index.html','rel="stylesheet"','rel="stylesheet" rel="preload"');
+  reject(f,/Duplicate stylesheet link rel/);
+  f=fixture();change(f,'index.html','rel="stylesheet"','rel=preload rel="stylesheet"');
+  reject(f,/Duplicate stylesheet link rel/);
+});
+test('inactive or conditional stylesheet links cannot establish renderer compatibility',()=>{
+  for(const attribute of ['disabled','media="print"','onload="activate()"']) {
+    const f=fixture();change(f,'index.html','rel="stylesheet"',`rel="stylesheet" ${attribute}`);
+    reject(f,/Unreviewed stylesheet link attributes/);
+  }
+  const f=fixture();
+  change(f,'index.html','<link rel="stylesheet" href="./assets/app-shared-a1.css">','<template><link rel="stylesheet" href="./assets/app-shared-a1.css"></template>');
+  reject(f,/Unreviewed renderer head element/);
+});
+test('stylesheet discovery refuses remote, redirected, or unreviewed path shapes',()=>{
+  for(const href of ['https://example.test/a1.css','./assets/../a1.css','./assets/custom.css','./assets/a1.css?other']) {
+    const f=fixture();change(f,'index.html','./assets/app-shared-a1.css',href);
+    reject(f,/Unexpected renderer stylesheet link/);
+  }
+});
+test('base URLs cannot redirect the reviewed relative stylesheet link',()=>{
+  for(const href of ['https://example.test/alternate/','./alternate/']) {
+    const f=fixture();change(f,'index.html','<head>',`<head><base href="${href}">`);
+    reject(f,/Unreviewed renderer head element/);
   }
 });
 

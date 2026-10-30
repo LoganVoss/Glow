@@ -1,5 +1,17 @@
 # Verification
 
+## 0.10.13 — App update compatibility, October 30, 2026
+
+Reviewed the actual OpenAI-signed **26.1027.30824 (22943)** archive against preserved build **22391**. The renderer now links a hash-only stylesheet filename. Inspector and builder share checked discovery of its single active HTML head link, retaining the legacy filename format and exact source hashes. Discovery refuses preloads, comments, embedded tag strings, duplicate attributes, inactive or conditional links, alternate base URLs, missing assets, and ambiguous stylesheets. The new Appearance and sidebar bindings are explicit reviewed variants; unknown or mixed variants remain refused.
+
+The Appearance component matches the previous build after reviewed binding/import renames, preserving the native mount, AppScope, theme schema, and non-optimistic writer. The complete sidebar hook retains its disabled guard, memoization, titlebar/menu registration, animation options, and optional fallback. Removing the added bridge restores the original primary module byte for byte. The actual split renderer import chain is unchanged. Native PageSurface class and all 31 related CSS blocks match build 22391; panel geometry, account footer, Settings heading, and guarded Home navigation remain compatible. No Glow runtime, visual, preference, or performance changes were needed.
+
+Passed **144 source/runtime/compatibility/transform/signing-policy tests**, **25 Glow browser cases**, **22 sidebar cases**, **12 theme cases**, and **4 early-window startup cases**. Refresh's **26 tests**, recovery, installer, and archive-preservation checks passed. The dependency audit reports no known vulnerabilities.
+
+All **nine** reviewed vendor builds pass compatibility inspection. Preparation returned **READY** for Glow **0.10.13** on build **22943**, reused the persistent local identity, verified **110 code objects**, and passed installation preflight. All nine source hashes and five packaged JavaScript modules match the source. Exactly nine packed renderer entries changed. Appearance and primary equal their reviewed transformations; initial, the settings bridge, and general settings remain byte-identical to the original. CSP, Electron fuses, original packed payload, vendor source, and installed baseline passed preservation checks. Documentation links resolve, and no private build or signing artifacts are tracked.
+
+All **three isolated packaged-module cases** passed with normal, deliberately failing, and missing Glow. They evaluate the actual initial and primary modules; the normal case also imports actual Settings and patched Appearance. Native launchers, initial renderer, and Settings modules were checked against the original bytes. The hosted app was not quit, replaced, or launched. Native launch, account services, updater behavior, and thermal performance remain separate [post-install smoke tests](smoke-test.md).
+
 ## 0.10.12 — App update compatibility, October 28, 2026
 
 Reviewed the actual OpenAI-signed **26.1023.50603 (22391)** archive against preserved build **21828**. Appearance's React/JSX/cache bindings and native scoped theme writer were renamed, as were the sidebar command bindings. Explicit reviewed variants now support those renames while preserving the original mount, non-optimistic theme writes, complete command registration, disabled guard, and native fallback. Removing the sidebar bridge restores the original primary module byte for byte. Unknown or mixed variants remain refused. All **eight** reviewed vendor builds pass compatibility inspection.

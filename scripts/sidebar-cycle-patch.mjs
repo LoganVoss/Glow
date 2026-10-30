@@ -47,6 +47,13 @@ export const SIDEBAR_VARIANTS = Object.freeze([
     registration: 'let o=a;VT(`toggleSidebar`,o);let s;r[4]!==i||r[5]!==e||r[6]!==t?(s=[i,e,t],r[4]=i,r[5]=e,r[6]=t,r[7]=s):s=r[7],wf(`toggle-sidebar`,o,s)',
     bridge: 'try{if(globalThis.__neonCodexRuntime?.cycleSidebar?.({open:e.get(RS),setOpen:__neonOpen=>xke(e,__neonOpen,{animate:t,transition:__neonOpen&&e.get(hP)?.type===`peek`?{type:`tween`,duration:.12,ease:[0,0,.58,1]}:void 0})})===true)return}catch{}',
   }),
+  Object.freeze({
+    id: '22943',
+    hook: 'function MAt(e,t,n){let r=(0,NAt.c)(8),i=n===void 0||n,a;r[0]!==i||r[1]!==e||r[2]!==t?(a=()=>{if(!i)return;let n=!e.get(mb);Q7e(e,n,{animate:t,transition:n&&e.get(GP)?.type===`peek`?{type:`tween`,duration:.12,ease:[0,0,.58,1]}:void 0})},r[0]=i,r[1]=e,r[2]=t,r[3]=a):a=r[3];let o=a;Th(`toggleSidebar`,o);let s;r[4]!==i||r[5]!==e||r[6]!==t?(s=[i,e,t],r[4]=i,r[5]=e,r[6]=t,r[7]=s):s=r[7],Se(`toggle-sidebar`,o,s)}',
+    callback: 'a=()=>{if(!i)return;let n=!e.get(mb);Q7e(e,n,{animate:t,transition:n&&e.get(GP)?.type===`peek`?{type:`tween`,duration:.12,ease:[0,0,.58,1]}:void 0})}',
+    registration: 'let o=a;Th(`toggleSidebar`,o);let s;r[4]!==i||r[5]!==e||r[6]!==t?(s=[i,e,t],r[4]=i,r[5]=e,r[6]=t,r[7]=s):s=r[7],Se(`toggle-sidebar`,o,s)',
+    bridge: 'try{if(globalThis.__neonCodexRuntime?.cycleSidebar?.({open:e.get(mb),setOpen:__neonOpen=>Q7e(e,__neonOpen,{animate:t,transition:__neonOpen&&e.get(GP)?.type===`peek`?{type:`tween`,duration:.12,ease:[0,0,.58,1]}:void 0})})===true)return}catch{}',
+  }),
 ]);
 
 // Preserve the original variant exports for existing source consumers.

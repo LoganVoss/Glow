@@ -7,7 +7,7 @@ import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { patchSidebarCycle } from './sidebar-cycle-patch.mjs';
 import { patchAppearance } from './appearance-patch.mjs';
-import { discoverRendererLayout } from './renderer-layout.mjs';
+import { discoverRendererLayout, discoverRendererStylesheet } from './renderer-layout.mjs';
 export { APPEARANCE_NEEDLE } from './appearance-patch.mjs';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -62,7 +62,7 @@ export function inspectStructure({ files, readFile, info, headerHash, frameworkB
     requireCheck(!html.includes('neon-codex'), 'Renderer is already patched; inspect the matching preserved original');
     const layout = discoverRendererLayout({ files: names, readFile, html });
     const initialPath = layout.initialPath;
-    const cssPath = one(names.filter(file => /^webview\/assets\/app-shared-[a-f0-9]+\.css$/.test(file) && html.includes(path.posix.basename(file))), 'referenced shared stylesheet');
+    const cssPath = discoverRendererStylesheet({ files: names, html });
     const appearancePath = one(names.filter(file => /^webview\/assets\/appearance-settings-[a-f0-9]+\.js$/.test(file)), 'Appearance component');
     const appearance = read(appearancePath);
     const appearanceImports = imports(appearance);

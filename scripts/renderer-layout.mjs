@@ -1,6 +1,42 @@
 import assert from 'node:assert/strict';
 import path from 'node:path';
 
+// Build 22943 uses a hash-only stylesheet name. Select the actual stylesheet
+// link, never a preload, comment, asset catalog, or incidental filename mention.
+export function discoverRendererStylesheet({ files, html }) {
+  // Only the reviewed document-head layout is supported. Consume whole quoted
+  // attributes and raw-text elements so strings containing tags are not links.
+  const markup = html.replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<(script|style|title)\b(?:[^>"']|"[^"]*"|'[^']*')*>[\s\S]*?<\/\1\s*>/gi, '');
+  const heads = [...markup.matchAll(/<head\s*>([\s\S]*?)<\/head\s*>/gi)];
+  assert.equal(heads.length, 1, 'Expected exactly one renderer head');
+  const links = [];
+  for (const [tag, name] of heads[0][1].matchAll(/<([a-z][\w:-]*)(?:[^>"']|"[^"]*"|'[^']*')*>/gi)) {
+    assert.ok(/^(?:meta|link)$/i.test(name), 'Unreviewed renderer head element');
+    if (name.toLowerCase() !== 'link') continue;
+    const attributes = new Map();
+    let rest = tag.slice(5, -1);
+    while (rest.trim()) {
+      if (rest.trim() === '/') break;
+      const match = rest.match(/^\s+([^\s"'<>\/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/);
+      assert.ok(match, 'Malformed renderer link attributes');
+      const key = match[1].toLowerCase();
+      assert.ok(!attributes.has(key), `Duplicate stylesheet link ${key} attribute`);
+      attributes.set(key, match[2] ?? match[3] ?? match[4] ?? null);
+      rest = rest.slice(match[0].length);
+    }
+    if (attributes.get('rel')?.toLowerCase() !== 'stylesheet') continue;
+    assert.ok([...attributes.keys()].every(key => ['rel', 'href', 'crossorigin'].includes(key)), 'Unreviewed stylesheet link attributes');
+    links.push(attributes);
+  }
+  assert.equal(links.length, 1, 'Expected exactly one referenced shared stylesheet');
+  const href = links[0].get('href');
+  assert.match(href ?? '', /^\.\/assets\/(?:app-shared-)?[a-f0-9]+\.css$/, 'Unexpected renderer stylesheet link');
+  const cssPath = `webview/${href.slice(2)}`;
+  assert.ok(files.map(file => file.replace(/^\//, '')).includes(cssPath), 'Missing referenced renderer stylesheet');
+  return cssPath;
+}
+
 // Literal imports only. Vite preload catalogs and source-map names are not
 // dependency edges and must never select the renderer that Glow patches.
 export function importPaths(source, { dynamic = false } = {}) {

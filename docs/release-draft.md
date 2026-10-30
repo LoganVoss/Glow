@@ -1,7 +1,8 @@
-# Glow 0.10.12 — App update compatibility
+# Glow 0.10.13 — App update compatibility
 
-Restores Glow support for **Codex/ChatGPT 26.1023.50603 (22391)**. Created by **Logan Voss + Astra 6 Ultra**.
+Restores Glow support for **Codex/ChatGPT 26.1027.30824 (22943)**. Created by **Logan Voss + Astra 6 Ultra**.
 
+- Supports the app's new stylesheet filenames through checked native HTML links.
 - Adapts Appearance and the sidebar toggle to the app's renamed native bindings.
 - Retains the reviewed split renderer, window geometry, and smooth sidebar transitions.
 - Preserves your colors, settings, and the existing memory and idle-rendering fixes.

@@ -16,7 +16,7 @@ import assert from 'node:assert/strict';
 import { withLocalIdentity } from './local-identity.mjs';
 import { patchSidebarCycle } from './sidebar-cycle-patch.mjs';
 import { patchAppearance } from './appearance-patch.mjs';
-import { discoverRendererLayout } from './renderer-layout.mjs';
+import { discoverRendererLayout, discoverRendererStylesheet } from './renderer-layout.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.dirname(HERE);
@@ -394,7 +394,7 @@ async function main() {
   const originalCSS = asar.extractFile(sourceArchive, PIN.css);
   assert.equal(sha(originalCSS), PIN.cssHash, 'Source stylesheet differs from reviewed version');
   const html = asar.extractFile(sourceArchive, 'webview/index.html').toString();
-  assert.ok(html.includes(path.posix.basename(PIN.css)), 'Reviewed stylesheet is not referenced by the renderer');
+  assert.equal(discoverRendererStylesheet({ files: asar.listPackage(sourceArchive), html }), PIN.css, 'Reviewed stylesheet linkage changed');
   const frameworkBytes = await fsp.readFile(sourceFramework);
   const frameworkState = inspectFramework(frameworkBytes, info.ElectronAsarIntegrity);
   run('/usr/bin/codesign', ['--verify', '--deep', '--strict', '--test-requirement', '=anchor apple generic and certificate leaf[subject.OU] = "2DC432GLL2"', source]);
